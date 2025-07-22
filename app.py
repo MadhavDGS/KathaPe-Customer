@@ -449,6 +449,10 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
+@customer_app.route('/favicon.ico')
+def favicon():
+    return send_from_directory('static', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
 # Error handling
 @customer_app.errorhandler(404)
 def page_not_found(e):
