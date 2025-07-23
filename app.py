@@ -425,6 +425,105 @@ def customer_profile():
     
     return render_template('customer/profile.html', customer=customer)
 
+@customer_app.route('/transaction/<transaction_type>/<business_id>', methods=['GET', 'POST'])
+@login_required
+@customer_required
+def customer_transaction(transaction_type, business_id):
+    customer_id = safe_uuid(session.get('customer_id'))
+    business_id = safe_uuid(business_id)
+    
+    # Validate transaction type
+    if transaction_type not in ['credit', 'payment']:
+        flash('Invalid transaction type', 'error')
+        return redirect(url_for('business_view', business_id=business_id))
+    
+    # Get business details
+    business_response = query_table('businesses', filters=[('id', 'eq', business_id)])
+    business = business_response.data[0] if business_response and business_response.data else {}
+    
+    if not business:
+        flash('Business not found', 'error')
+        return redirect(url_for('customer_dashboard'))
+    
+    if request.method == 'POST':
+        amount = request.form.get('amount')
+        notes = request.form.get('notes', '')
+        
+        try:
+            amount = float(amount) if amount else 0
+            if amount <= 0:
+                flash('Please enter a valid amount', 'error')
+                return render_template('customer/transaction.html', 
+                                     business=business, 
+                                     transaction_type=transaction_type)
+            
+            # Create transaction record
+            transaction_data = {
+                'id': str(uuid.uuid4()),
+                'business_id': business_id,
+                'customer_id': customer_id,
+                'transaction_type': transaction_type,
+                'amount': amount,
+                'notes': notes,
+                'created_at': datetime.now().isoformat()
+            }
+            
+            # Insert transaction
+            result = query_table('transactions', query_type='insert', data=transaction_data)
+            
+            if result and result.data:
+                # Update customer credits table
+                credit_response = query_table('customer_credits', 
+                                            filters=[('business_id', 'eq', business_id),
+                                                    ('customer_id', 'eq', customer_id)])
+                
+                if credit_response and credit_response.data:
+                    # Update existing credit record
+                    credit = credit_response.data[0]
+                    current_balance = float(credit.get('current_balance', 0))
+                    
+                    if transaction_type == 'credit':
+                        new_balance = current_balance + amount
+                    else:  # payment
+                        new_balance = current_balance - amount
+                    
+                    update_data = {
+                        'current_balance': new_balance,
+                        'last_transaction_date': datetime.now().isoformat()
+                    }
+                    
+                    query_table('customer_credits', query_type='update', 
+                               filters=[('id', 'eq', credit['id'])], data=update_data)
+                else:
+                    # Create new credit record
+                    credit_data = {
+                        'id': str(uuid.uuid4()),
+                        'business_id': business_id,
+                        'customer_id': customer_id,
+                        'current_balance': amount if transaction_type == 'credit' else -amount,
+                        'total_credit_taken': amount if transaction_type == 'credit' else 0,
+                        'total_payments_made': amount if transaction_type == 'payment' else 0,
+                        'last_transaction_date': datetime.now().isoformat(),
+                        'created_at': datetime.now().isoformat()
+                    }
+                    
+                    query_table('customer_credits', query_type='insert', data=credit_data)
+                
+                action = 'taken credit of' if transaction_type == 'credit' else 'made payment of'
+                flash(f'Successfully {action} ₹{amount}', 'success')
+                return redirect(url_for('business_view', business_id=business_id))
+            else:
+                flash('Failed to record transaction', 'error')
+                
+        except ValueError:
+            flash('Please enter a valid amount', 'error')
+        except Exception as e:
+            flash(f'Error processing transaction: {str(e)}', 'error')
+    
+    return render_template('customer/transaction.html', 
+                         business=business, 
+                         transaction_type=transaction_type)
+
 @customer_app.route('/transaction_history')
 @login_required
 @customer_required

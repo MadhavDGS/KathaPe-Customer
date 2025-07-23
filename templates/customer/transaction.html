@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Take Credit' if transaction_type == 'credit' else 'Make Payment' }}{% endblock %}
+
+{% block header_title %}{{ 'Take Credit' if transaction_type == 'credit' else 'Make Payment' }}{% endblock %}
+
+{% block content %}
+<div class="transaction-container">
+    <div class="business-header">
+        <h2>{{ business.get('name', 'Business') }}</h2>
+        <p class="business-location">{{ business.get('location', '') }}</p>
+    </div>
+
+    <div class="transaction-form-container">
+        <div class="transaction-type-indicator {{ 'credit-indicator' if transaction_type == 'credit' else 'payment-indicator' }}">
+            <i class="fas {{ 'fa-arrow-circle-up' if transaction_type == 'credit' else 'fa-arrow-circle-down' }}"></i>
+            <h3>{{ 'Take Credit' if transaction_type == 'credit' else 'Make Payment' }}</h3>
+        </div>
+
+        <form method="POST" class="transaction-form">
+            <div class="form-group">
+                <label for="amount">Amount (₹)</label>
+                <input type="number" id="amount" name="amount" step="0.01" min="0.01" required
+                       class="form-control amount-input" placeholder="Enter amount">
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notes (Optional)</label>
+                <textarea id="notes" name="notes" class="form-control" rows="3" 
+                         placeholder="Add a note about this transaction..."></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary transaction-btn {{ 'credit-btn' if transaction_type == 'credit' else 'payment-btn' }}">
+                    <i class="fas {{ 'fa-arrow-circle-up' if transaction_type == 'credit' else 'fa-arrow-circle-down' }}"></i>
+                    {{ 'Take Credit' if transaction_type == 'credit' else 'Make Payment' }}
+                </button>
+                <a href="{{ url_for('business_view', business_id=business.id) }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Business
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.transaction-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.business-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+
+.business-header h2 {
+    color: #5c67de;
+    margin-bottom: 5px;
+}
+
+.business-location {
+    color: #6c757d;
+    margin: 0;
+}
+
+.transaction-form-container {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.transaction-type-indicator {
+    padding: 20px;
+    text-align: center;
+    color: white;
+}
+
+.credit-indicator {
+    background: linear-gradient(135deg, #28a745, #20c997);
+}
+
+.payment-indicator {
+    background: linear-gradient(135deg, #dc3545, #fd7e14);
+}
+
+.transaction-type-indicator i {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
+
+.transaction-type-indicator h3 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.transaction-form {
+    padding: 30px;
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #495057;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #5c67de;
+    box-shadow: 0 0 0 3px rgba(92, 103, 222, 0.1);
+}
+
+.amount-input {
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.form-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.transaction-btn {
+    flex: 1;
+    min-width: 200px;
+    padding: 15px 25px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.credit-btn {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+}
+
+.credit-btn:hover {
+    background: linear-gradient(135deg, #218838, #1ea085);
+    transform: translateY(-2px);
+}
+
+.payment-btn {
+    background: linear-gradient(135deg, #dc3545, #fd7e14);
+    color: white;
+}
+
+.payment-btn:hover {
+    background: linear-gradient(135deg, #c82333, #e66800);
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    padding: 15px 25px;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+    color: white;
+    text-decoration: none;
+    transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+    .transaction-container {
+        padding: 10px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .transaction-btn {
+        min-width: auto;
+    }
+}
+</style>
+{% endblock %}
