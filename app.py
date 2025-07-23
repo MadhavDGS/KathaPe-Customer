@@ -176,12 +176,14 @@ def register():
 def customer_dashboard():
     try:
         customer_id = safe_uuid(session.get('customer_id'))
+        print(f"DEBUG: Customer dashboard - customer_id from session: {customer_id}")
         
         # Get customer details
         customer_response = query_table('customers', filters=[('id', 'eq', customer_id)])
         
         if customer_response and customer_response.data:
             customer = customer_response.data[0]
+            print(f"DEBUG: Found customer in database: {customer.get('name', 'Unknown')}")
         else:
             # Create mock customer object from session data
             customer = {
@@ -189,6 +191,7 @@ def customer_dashboard():
                 'name': session.get('user_name', 'Your Name'),
                 'phone_number': session.get('phone_number', '0000000000')
             }
+            print(f"DEBUG: Using mock customer data: {customer['name']}")
         
         # Get customer's credit relationships with businesses
         credit_relationships = []
@@ -209,9 +212,13 @@ def customer_dashboard():
                 """, [customer_id])
                 
                 credits_data = cursor.fetchall()
+                print(f"DEBUG: Found {len(credits_data)} credit relationships for customer {customer_id}")
                 for credit in credits_data:
+                    print(f"DEBUG: Credit relationship - Business: {credit['business_name']}, Balance: {credit['current_balance']}")
                     credit_relationships.append({
+                        'id': credit['business_id'],  # Template expects 'id' not 'business_id'
                         'business_id': credit['business_id'],
+                        'name': credit['business_name'],  # Template expects 'name' not 'business_name'
                         'business_name': credit['business_name'],
                         'current_balance': float(credit['current_balance']) if credit['current_balance'] else 0,
                         'updated_at': credit['updated_at']
@@ -253,6 +260,7 @@ def customer_dashboard():
         return render_template('customer/dashboard.html',
                              customer=customer,
                              summary=summary,
+                             businesses=credit_relationships,  # Pass as 'businesses' for template
                              credit_relationships=credit_relationships,
                              recent_transactions=recent_transactions)
                              

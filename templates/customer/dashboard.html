@@ -397,7 +397,7 @@
         <div class="businesses-list">
             {% if businesses %}
                 {% for business in businesses %}
-                    <a href="{{ url_for('customer_business_view', business_id=business.id) }}" class="business-card">
+                    <a href="{{ url_for('business_view', business_id=business.id) }}" class="business-card">
                         <div class="business-card-inner">
                             <div class="business-icon">
                                 <i class="fas fa-store"></i>
