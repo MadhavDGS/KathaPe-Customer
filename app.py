@@ -313,12 +313,18 @@ def business_view(business_id):
     credit_received = sum([float(t.get('amount', 0)) for t in transactions if t.get('transaction_type') == 'credit'])
     payments_made = sum([float(t.get('amount', 0)) for t in transactions if t.get('transaction_type') == 'payment'])
     
+    # Calculate current balance and credit total
+    current_balance = credit_received - payments_made  # Positive means customer owes money
+    credit_total = credit_received
+    
     return render_template('customer/business_view.html',
                          business=business,
                          credit=credit,
                          transactions=transactions,
                          credit_received=credit_received,
-                         payments_made=payments_made)
+                         payments_made=payments_made,
+                         current_balance=current_balance,
+                         credit_total=credit_total)
 
 @customer_app.route('/select_business', methods=['GET', 'POST'])
 @login_required
