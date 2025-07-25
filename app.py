@@ -10,6 +10,18 @@ customer_app = create_app('KathaPe-Customer')
 def datetime_filter(value, format='%d %b %Y, %I:%M %p'):
     return format_datetime(value, format)
 
+@customer_app.template_filter('currency')
+def currency_filter(value):
+    """Format a number as currency with proper decimal places"""
+    if value is None:
+        return "₹0.00"
+    try:
+        # Convert to float and format with 2 decimal places
+        amount = float(value)
+        return f"₹{amount:,.2f}"
+    except (ValueError, TypeError):
+        return "₹0.00"
+
 # Customer routes
 @customer_app.route('/')
 def index():
