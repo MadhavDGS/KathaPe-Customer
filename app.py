@@ -80,7 +80,7 @@ def login():
                     cursor.execute("SELECT id, name, password FROM users WHERE phone_number = %s AND user_type = 'customer' LIMIT 1", [phone])
                     user_data = cursor.fetchone()
                     
-                    if user_data:
+                    if user_data and user_data['password'] == password:
                         user_id = user_data['id']
                         session['user_id'] = user_id
                         session['user_name'] = user_data.get('name', user_name)
@@ -100,10 +100,14 @@ def login():
                             """, [customer_id, user_id, session['user_name'], phone, datetime.now().isoformat()])
                             conn.commit()
                             session['customer_id'] = customer_id
-                
-                conn.close()
-                flash('Successfully logged in!', 'success')
-                return redirect(url_for('customer_dashboard'))
+                        
+                        conn.close()
+                        flash('Successfully logged in!', 'success')
+                        return redirect(url_for('customer_dashboard'))
+                    else:
+                        conn.close()
+                        flash('Invalid phone number or password', 'error')
+                        return render_template('login.html')
                 
             except Exception as e:
                 logger.error(f"Database error in customer login: {str(e)}")
