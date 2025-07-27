@@ -2,6 +2,7 @@
 Customer Flask Application - Handles all customer-related operations
 """
 from common_utils import *
+from common_utils import get_ist_isoformat, get_ist_now
 
 # Create the customer Flask app
 customer_app = create_app('KathaPe-Customer')
@@ -87,7 +88,7 @@ def login():
                             cursor.execute("""
                                 INSERT INTO customers (id, user_id, name, phone_number, created_at)
                                 VALUES (%s, %s, %s, %s, %s)
-                            """, [customer_id, user_id, session['user_name'], phone, datetime.now().isoformat()])
+                            """, [customer_id, user_id, session['user_name'], phone, get_ist_isoformat()])
                             conn.commit()
                             session['customer_id'] = customer_id
                         
@@ -144,7 +145,7 @@ def register():
                 VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
             """
-            user_result = execute_query(user_query, [user_id, name, phone, 'customer', password, datetime.now().isoformat()], fetch_one=True)
+            user_result = execute_query(user_query, [user_id, name, phone, 'customer', password, get_ist_isoformat()], fetch_one=True)
             
             if user_result:
                 # Create customer record
@@ -152,7 +153,7 @@ def register():
                     INSERT INTO customers (id, user_id, name, phone_number, created_at)
                     VALUES (%s, %s, %s, %s, %s)
                 """
-                execute_query(customer_query, [customer_id, user_id, name, phone, datetime.now().isoformat()])
+                execute_query(customer_query, [customer_id, user_id, name, phone, get_ist_isoformat()])
                 
                 flash('Registration successful! Please login.', 'success')
                 return redirect(url_for('login'))
@@ -209,16 +210,30 @@ def customer_dashboard():
                 credits_data = cursor.fetchall()
                 print(f"DEBUG: Found {len(credits_data)} credit relationships for customer {customer_id}")
                 for credit in credits_data:
-                    print(f"DEBUG: Credit relationship - Business: {credit['business_name']}, Balance: {credit['current_balance']}")
+                    business_id = credit['business_id']
+                    
+                    # Calculate actual balance from transactions (same method as business view)
+                    cursor.execute("""
+                        SELECT amount, transaction_type 
+                        FROM transactions 
+                        WHERE business_id = %s AND customer_id = %s
+                    """, [business_id, customer_id])
+                    
+                    transactions_data = cursor.fetchall()
+                    credit_received = sum([float(tx['amount']) for tx in transactions_data if tx['transaction_type'] == 'credit'])
+                    payments_made = sum([float(tx['amount']) for tx in transactions_data if tx['transaction_type'] == 'payment'])
+                    actual_balance = credit_received - payments_made
+                    
+                    print(f"DEBUG: Credit relationship - Business: {credit['business_name']}, Actual Balance: {actual_balance}")
                     credit_relationships.append({
                         'id': credit['business_id'],  # Template expects 'id' not 'business_id'
                         'business_id': credit['business_id'],
                         'name': credit['business_name'],  # Template expects 'name' not 'business_name'
                         'business_name': credit['business_name'],
-                        'current_balance': float(credit['current_balance']) if credit['current_balance'] else 0,
+                        'current_balance': actual_balance,
                         'updated_at': credit['updated_at']
                     })
-                    total_balance += float(credit['current_balance']) if credit['current_balance'] else 0
+                    total_balance += actual_balance
                 
                 # Get recent transactions
                 cursor.execute("""
@@ -281,7 +296,18 @@ def businesses():
             business_detail = query_table('businesses', filters=[('id', 'eq', business_id)])
             if business_detail and business_detail.data:
                 business = business_detail.data[0]
-                business['current_balance'] = float(credit.get('current_balance', 0))
+                
+                # Calculate actual balance from transactions (same method as business view)
+                transactions_response = query_table('transactions',
+                                                  filters=[('business_id', 'eq', business_id),
+                                                          ('customer_id', 'eq', customer_id)])
+                transactions = transactions_response.data if transactions_response and transactions_response.data else []
+                
+                credit_received = sum([float(t.get('amount', 0)) for t in transactions if t.get('transaction_type') == 'credit'])
+                payments_made = sum([float(t.get('amount', 0)) for t in transactions if t.get('transaction_type') == 'payment'])
+                actual_balance = credit_received - payments_made
+                
+                business['current_balance'] = actual_balance
                 businesses.append(business)
     
     return render_template('customer/businesses.html', businesses=businesses)
@@ -316,9 +342,8 @@ def business_view(business_id):
     credit_received = sum([float(t.get('amount', 0)) for t in transactions if t.get('transaction_type') == 'credit'])
     payments_made = sum([float(t.get('amount', 0)) for t in transactions if t.get('transaction_type') == 'payment'])
     
-    # Calculate current balance and credit total
+    # Calculate current balance
     current_balance = credit_received - payments_made  # Positive means customer owes money
-    credit_total = credit_received
     
     return render_template('customer/business_view.html',
                          business=business,
@@ -326,8 +351,7 @@ def business_view(business_id):
                          transactions=transactions,
                          credit_received=credit_received,
                          payments_made=payments_made,
-                         current_balance=current_balance,
-                         credit_total=credit_total)
+                         current_balance=current_balance)
 
 @customer_app.route('/select_business', methods=['GET', 'POST'])
 @login_required
@@ -361,8 +385,8 @@ def select_business():
                         'business_id': business_id,
                         'customer_id': customer_id,
                         'current_balance': 0,
-                        'created_at': datetime.now().isoformat(),
-                        'updated_at': datetime.now().isoformat()
+                        'created_at': get_ist_isoformat(),
+                        'updated_at': get_ist_isoformat()
                     }
                     
                     query_table('customer_credits', query_type='insert', data=credit_data)
@@ -468,7 +492,7 @@ def customer_transaction(transaction_type, business_id):
                 'transaction_type': transaction_type,
                 'amount': amount,
                 'notes': notes,
-                'created_at': datetime.now().isoformat()
+                'created_at': get_ist_isoformat()
             }
             
             # Insert transaction
@@ -492,7 +516,7 @@ def customer_transaction(transaction_type, business_id):
                     
                     update_data = {
                         'current_balance': new_balance,
-                        'last_transaction_date': datetime.now().isoformat()
+                        'updated_at': get_ist_isoformat()
                     }
                     
                     query_table('customer_credits', query_type='update', 
@@ -504,10 +528,8 @@ def customer_transaction(transaction_type, business_id):
                         'business_id': business_id,
                         'customer_id': customer_id,
                         'current_balance': amount if transaction_type == 'credit' else -amount,
-                        'total_credit_taken': amount if transaction_type == 'credit' else 0,
-                        'total_payments_made': amount if transaction_type == 'payment' else 0,
-                        'last_transaction_date': datetime.now().isoformat(),
-                        'created_at': datetime.now().isoformat()
+                        'updated_at': get_ist_isoformat(),
+                        'created_at': get_ist_isoformat()
                     }
                     
                     query_table('customer_credits', query_type='insert', data=credit_data)

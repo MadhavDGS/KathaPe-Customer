@@ -28,16 +28,6 @@
                 </div>
             </div>
         </div>
-        
-        <div class="balance-card credit-total">
-            <div class="balance-icon">
-                <i class="fas fa-hand-holding-usd"></i>
-            </div>
-            <div class="balance-content">
-                <div class="balance-label">Total Credit Taken</div>
-                <div class="balance-amount">₹{{ credit_total|default(0) }}</div>
-            </div>
-        </div>
     </div>
 
     <div class="action-buttons">
@@ -194,15 +184,6 @@ body {
 .balance-primary .balance-icon {
     background-color: var(--primary-light);
     color: var(--primary-color);
-}
-
-.credit-total {
-    border-left: 4px solid var(--credit-color);
-}
-
-.credit-total .balance-icon {
-    background-color: var(--credit-light);
-    color: var(--credit-color);
 }
 
 .payment-total {
@@ -459,4 +440,7 @@ body {
         padding: 15px 12px 30px;
     }
 }
+{% endblock %}
+
+{% block scripts %}
 {% endblock %} 

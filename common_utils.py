@@ -18,6 +18,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from functools import wraps
 from dotenv import load_dotenv
+import pytz
 import sys
 import logging
 import io
@@ -28,6 +29,10 @@ from PIL import Image
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Setup timezone
+IST = pytz.timezone('Asia/Kolkata')
+UTC = pytz.UTC
 
 # Check if running on Render
 RENDER_DEPLOYMENT = os.environ.get('RENDER', False)
@@ -524,16 +529,49 @@ def create_app(app_name='KathaPe'):
     
     return app
 
+# IST timezone helper functions
+def get_ist_now():
+    """Get current datetime in IST timezone"""
+    return datetime.now(IST)
+
+def get_ist_isoformat():
+    """Get current datetime in IST as ISO format string"""
+    return get_ist_now().isoformat()
+
+def convert_to_ist(dt):
+    """Convert datetime to IST timezone"""
+    if isinstance(dt, str):
+        try:
+            # Parse ISO format string
+            dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
+        except:
+            return dt
+    
+    # If datetime is naive (no timezone)
+    if dt.tzinfo is None:
+        # For naive datetimes, assume they are already in local time (IST)
+        # This is because most naive timestamps in our database are likely stored in local time
+        dt = IST.localize(dt)
+    else:
+        # If it already has timezone info, convert to IST
+        dt = dt.astimezone(IST)
+    
+    return dt
+
 # Add template filter for datetime formatting
 def format_datetime(value, format='%d %b %Y, %I:%M %p'):
     if isinstance(value, str):
         try:
             # Try to parse ISO format first
             dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
-            return dt.strftime(format)
+            # Convert to IST for display
+            dt_ist = convert_to_ist(dt)
+            return dt_ist.strftime(format)
         except:
             return value
     elif hasattr(value, 'strftime'):
-        return value.strftime(format)
+        # Convert to IST for display
+        dt_ist = convert_to_ist(value)
+        return dt_ist.strftime(format)
     else:
         return str(value)
