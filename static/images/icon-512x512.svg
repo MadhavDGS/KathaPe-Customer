@@ -1,0 +1,7 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="64" fill="#5c67de"/>
+  <rect x="64" y="64" width="384" height="384" rx="32" fill="white"/>
+  <text x="256" y="320" font-family="Arial, sans-serif" font-size="128" font-weight="bold" text-anchor="middle" fill="#5c67de">K</text>
+  <circle cx="256" cy="160" r="50" fill="#5c67de"/>
+  <rect x="170" y="380" width="172" height="20" rx="10" fill="#5c67de"/>
+</svg>

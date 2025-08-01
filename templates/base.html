@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %} - KathaPe</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#5c67de">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="KathaPe">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/icon-192x192.svg') }}">
+    
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -174,6 +183,45 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
         
+        /* Install PWA button */
+        .install-button {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.6);
+            z-index: 1000;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .install-button:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+            box-shadow: 0 12px 35px rgba(40, 167, 69, 0.8);
+        }
+        
+        .install-button i {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+        }
+        
+        .install-button-text {
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+            line-height: 1.2;
+        }
+        
         /* Main container */
         .container {
             flex: 1;
@@ -304,7 +352,7 @@
             }
             
             .theme-toggle {
-                bottom: 80px;
+                bottom: 140px;
                 right: 20px;
                 width: 50px;
                 height: 50px;
@@ -313,6 +361,19 @@
             
             .theme-toggle i {
                 font-size: 1.4rem;
+            }
+            
+            .install-button {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .install-button i {
+                font-size: 2rem;
+            }
+            
+            .install-button-text {
+                font-size: 10px;
             }
         }
         
@@ -353,6 +414,11 @@
     <div class="theme-toggle" onclick="toggleTheme()">
         <i class="fas fa-moon"></i>
         <i class="fas fa-sun" style="display: none;"></i>
+    </div>
+    
+    <div class="install-button" id="installButton" onclick="installApp()" title="Add to Home Screen">
+        <i class="fas fa-download"></i>
+        <div class="install-button-text">Add to<br>Home</div>
     </div>
     
     <div class="container">
@@ -418,6 +484,184 @@
                     document.body.classList.add('dark-mode');
                 }
             }
+            
+            // Register service worker
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/static/sw.js')
+                        .then(function(registration) {
+                            console.log('ServiceWorker registration successful');
+                        }, function(err) {
+                            console.log('ServiceWorker registration failed: ', err);
+                        });
+                });
+            }
+        });
+        
+        // PWA Install functionality
+        let deferredPrompt;
+        const installButton = document.getElementById('installButton');
+        
+        // Show install button initially for testing
+        console.log('Install button element:', installButton);
+        if (installButton) {
+            installButton.style.display = 'flex';
+            console.log('Install button is now visible');
+        }
+        
+        // Force PWA install criteria detection for localhost
+        let canInstall = false;
+        
+        // Listen for the beforeinstallprompt event
+        window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('✅ beforeinstallprompt event fired - PWA can be installed!');
+            e.preventDefault();
+            deferredPrompt = e;
+            canInstall = true;
+            
+            if (installButton) {
+                installButton.style.display = 'flex';
+                installButton.style.background = 'linear-gradient(135deg, #007bff, #0056b3)';
+                installButton.querySelector('.install-button-text').innerHTML = 'Install<br>Now!';
+                console.log('✅ Native install prompt is available');
+            }
+        });
+        
+        // For localhost testing - simulate install readiness after service worker loads
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js').then((registration) => {
+                console.log('✅ Service Worker registered successfully');
+                
+                // Wait a bit then check if we can trigger install
+                setTimeout(() => {
+                    if (!deferredPrompt && installButton) {
+                        console.log('🔧 Attempting to trigger install readiness for localhost');
+                        
+                        // Simulate engagement metrics for PWA install criteria
+                        const simulateEngagement = () => {
+                            // Create fake user interactions to meet PWA criteria
+                            const clickEvent = new MouseEvent('click', { bubbles: true });
+                            const touchEvent = new TouchEvent('touchstart', { bubbles: true });
+                            
+                            document.dispatchEvent(clickEvent);
+                            setTimeout(() => {
+                                // Try to trigger the install prompt manually
+                                if (!deferredPrompt) {
+                                    console.log('⚡ Forcing install availability for localhost testing');
+                                    canInstall = true;
+                                    
+                                    if (installButton) {
+                                        installButton.style.background = 'linear-gradient(135deg, #28a745, #20c997)';
+                                        installButton.querySelector('.install-button-text').innerHTML = 'Add to<br>Home';
+                                    }
+                                }
+                            }, 500);
+                        };
+                        
+                        simulateEngagement();
+                    }
+                }, 2000);
+            }).catch((err) => {
+                console.log('❌ Service Worker registration failed:', err);
+            });
+        }
+        
+        // Check if app is already installed
+        if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+            console.log('ℹ️ App is running in standalone mode (already installed)');
+            if (installButton) {
+                installButton.style.display = 'none';
+            }
+        }
+        
+        function installApp() {
+            console.log('Install button clicked');
+            
+            // Check if we have the native install prompt
+            if (deferredPrompt) {
+                console.log('Using native PWA install prompt');
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                        if (installButton) {
+                            installButton.style.display = 'none';
+                        }
+                        alert('✅ KathaPe has been added to your home screen!');
+                    } else {
+                        console.log('User dismissed the install prompt');
+                    }
+                    deferredPrompt = null;
+                });
+                return;
+            }
+            
+            // Try to trigger install using other methods
+            console.log('Attempting alternative install methods');
+            
+            // Check if running in standalone mode (already installed)
+            if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+                alert('✅ App is already installed on your device!');
+                if (installButton) {
+                    installButton.style.display = 'none';
+                }
+                return;
+            }
+            
+            // Check for iOS and try to trigger native behavior
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isAndroid = /Android/.test(navigator.userAgent);
+            const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+            const isSafari = /Safari/.test(navigator.userAgent) && /Apple Computer/.test(navigator.vendor) && !isChrome;
+            
+            if (isIOS && isSafari) {
+                // For iOS Safari, we need to show instructions as there's no programmatic way
+                alert('📱 To install KathaPe:\n\n1. Tap the Share button (⬆️) below\n2. Select "Add to Home Screen"\n3. Tap "Add"\n\n✨ The app will appear on your home screen!');
+                return;
+            }
+            
+            if (isAndroid && isChrome) {
+                // For Android Chrome, try to trigger the install banner
+                console.log('Android Chrome detected, checking for install criteria');
+                
+                // Check if service worker is ready
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then(() => {
+                        console.log('Service worker is ready');
+                        
+                        // Try to trigger install event manually
+                        const installEvent = new Event('beforeinstallprompt');
+                        window.dispatchEvent(installEvent);
+                        
+                        // Fallback: Show Chrome-specific instructions
+                        setTimeout(() => {
+                            if (!deferredPrompt) {
+                                alert('🔧 To install KathaPe on Android:\n\n1. Open Chrome menu (⋮)\n2. Tap "Add to Home screen"\n3. Tap "Add"\n\n✨ App will be added to your home screen!');
+                            }
+                        }, 1000);
+                    });
+                } else {
+                    alert('🔧 To install: Open in Chrome → Menu (⋮) → "Add to Home screen"');
+                }
+                return;
+            }
+            
+            // For desktop browsers
+            if (isChrome && !isAndroid && !isIOS) {
+                alert('� To install KathaPe on desktop:\n\n1. Look for the install icon (⬇️) in the address bar\n2. OR click Chrome menu (⋮) → "Install KathaPe"\n3. Click "Install"\n\n✨ App will open in its own window!');
+                return;
+            }
+            
+            // Generic fallback
+            alert('🌐 To add KathaPe to your home screen:\n\n• Chrome: Menu → "Add to Home screen"\n• Safari: Share → "Add to Home Screen"\n• Edge: Menu → "Apps" → "Install this site"\n\n✨ Access KathaPe like a native app!');
+        }
+        
+        // Hide the install button if the app is already installed
+        window.addEventListener('appinstalled', () => {
+            if (installButton) {
+                installButton.style.display = 'none';
+            }
+            console.log('PWA was installed');
         });
         
         // Mobile navigation functionality
