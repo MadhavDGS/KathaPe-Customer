@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kathape-v1';
+const CACHE_NAME = 'khatape-v1';
 const urlsToCache = [
   '/',
   '/static/css/style.css',

@@ -1,4 +1,4 @@
-# KathaPe Customer App
+# KhataPe Customer App
 
 A Flask-based customer application for managing business interactions and credit tracking.
 

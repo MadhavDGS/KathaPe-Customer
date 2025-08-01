@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: kathape-customer
+    name: khatape-customer
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:customer_app --bind 0.0.0.0:$PORT

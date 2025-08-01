@@ -12,7 +12,7 @@ sys.path.append(os.path.join(parent_dir, 'shared'))
 from app import customer_app
 
 if __name__ == '__main__':
-    print("Starting KathaPe Customer Application...")
+    print("Starting KhataPe Customer Application...")
     print("Customer app will be available at: http://localhost:5002")
     print("Press Ctrl+C to stop the application")
     

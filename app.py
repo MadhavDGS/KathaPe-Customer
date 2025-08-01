@@ -5,7 +5,7 @@ from common_utils import *
 from common_utils import get_ist_isoformat, get_ist_now
 
 # Create the customer Flask app
-customer_app = create_app('KathaPe-Customer')
+customer_app = create_app('KhataPe-Customer')
 
 @customer_app.template_filter('datetime')
 def datetime_filter(value, format='%d %b %Y, %I:%M %p'):
