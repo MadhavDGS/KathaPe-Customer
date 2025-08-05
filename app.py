@@ -118,12 +118,17 @@ def login():
 @customer_app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        phone = request.form.get('phone')
+        phone = request.form.get('phone', '').strip()
         password = request.form.get('password')
-        name = request.form.get('name', f"Customer {phone[-4:]}")
+        name = request.form.get('name', f"Customer {phone[-4:]}" if phone and len(phone) >= 4 else "Customer User")
         
         if not phone or not password:
             flash('Please enter both phone number and password', 'error')
+            return render_template('register.html')
+        
+        # Validate phone number - must be exactly 10 digits
+        if not phone.isdigit() or len(phone) != 10:
+            flash('Phone number must be exactly 10 digits', 'error')
             return render_template('register.html')
         
         try:
@@ -155,8 +160,15 @@ def register():
                 """
                 execute_query(customer_query, [customer_id, user_id, name, phone, get_ist_isoformat()])
                 
-                flash('Registration successful! Please login.', 'success')
-                return redirect(url_for('login'))
+                # Auto-login the user after successful registration
+                session['user_id'] = user_id
+                session['customer_id'] = customer_id  # Add this line!
+                session['user_type'] = 'customer'
+                session['phone_number'] = phone
+                session['name'] = name
+                
+                flash('Registration successful! Welcome to KhataPe!', 'success')
+                return redirect(url_for('customer_dashboard'))
             else:
                 flash('Registration failed. Please try again.', 'error')
                 
@@ -459,6 +471,22 @@ def customer_transaction(transaction_type, business_id):
     customer_id = safe_uuid(session.get('customer_id'))
     business_id = safe_uuid(business_id)
     
+    print(f"DEBUG: Transaction route called with customer_id: {customer_id}, business_id: {business_id}")
+    
+    # Validate that customer exists
+    customer_check = query_table('customers', filters=[('id', 'eq', customer_id)])
+    if not customer_check or not customer_check.data:
+        print(f"ERROR: Customer {customer_id} not found in database")
+        flash('Customer account not found. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    
+    # Validate that business exists  
+    business_check = query_table('businesses', filters=[('id', 'eq', business_id)])
+    if not business_check or not business_check.data:
+        print(f"ERROR: Business {business_id} not found in database")
+        flash('Business not found', 'error')
+        return redirect(url_for('customer_dashboard'))
+    
     # Validate transaction type
     if transaction_type not in ['credit', 'payment']:
         flash('Invalid transaction type', 'error')
@@ -484,6 +512,9 @@ def customer_transaction(transaction_type, business_id):
                                      business=business, 
                                      transaction_type=transaction_type)
             
+            # Debug logging
+            print(f"DEBUG: Creating transaction - customer_id: {customer_id}, business_id: {business_id}, type: {transaction_type}, amount: {amount}")
+            
             # Create transaction record
             transaction_data = {
                 'id': str(uuid.uuid4()),
@@ -495,14 +526,21 @@ def customer_transaction(transaction_type, business_id):
                 'created_at': get_ist_isoformat()
             }
             
+            print(f"DEBUG: Transaction data: {transaction_data}")
+            
             # Insert transaction
             result = query_table('transactions', query_type='insert', data=transaction_data)
+            
+            print(f"DEBUG: Insert result: {result}")
+            print(f"DEBUG: Result data: {result.data if result else 'None'}")
             
             if result and result.data:
                 # Update customer credits table
                 credit_response = query_table('customer_credits', 
                                             filters=[('business_id', 'eq', business_id),
                                                     ('customer_id', 'eq', customer_id)])
+                
+                print(f"DEBUG: Credit response: {credit_response.data if credit_response else 'None'}")
                 
                 if credit_response and credit_response.data:
                     # Update existing credit record
@@ -514,15 +552,19 @@ def customer_transaction(transaction_type, business_id):
                     else:  # payment
                         new_balance = current_balance - amount
                     
+                    print(f"DEBUG: Updating balance from {current_balance} to {new_balance}")
+                    
                     update_data = {
                         'current_balance': new_balance,
                         'updated_at': get_ist_isoformat()
                     }
                     
-                    query_table('customer_credits', query_type='update', 
+                    update_result = query_table('customer_credits', query_type='update', 
                                filters=[('id', 'eq', credit['id'])], data=update_data)
+                    print(f"DEBUG: Update result: {update_result}")
                 else:
                     # Create new credit record
+                    print("DEBUG: Creating new credit record")
                     credit_data = {
                         'id': str(uuid.uuid4()),
                         'business_id': business_id,
@@ -532,13 +574,15 @@ def customer_transaction(transaction_type, business_id):
                         'created_at': get_ist_isoformat()
                     }
                     
-                    query_table('customer_credits', query_type='insert', data=credit_data)
+                    credit_result = query_table('customer_credits', query_type='insert', data=credit_data)
+                    print(f"DEBUG: Credit insert result: {credit_result}")
                 
                 action = 'taken credit of' if transaction_type == 'credit' else 'made payment of'
                 flash(f'Successfully {action} ₹{amount}', 'success')
                 return redirect(url_for('business_view', business_id=business_id))
             else:
-                flash('Failed to record transaction', 'error')
+                print("ERROR: Failed to insert transaction - result or result.data is None/empty")
+                flash('Failed to record transaction. Please check your database connection.', 'error')
                 
         except ValueError:
             flash('Please enter a valid amount', 'error')
