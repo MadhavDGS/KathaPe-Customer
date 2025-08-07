@@ -334,6 +334,21 @@
         @media (max-width: 768px) {
             .nav-toggle {
                 display: block;
+                padding: 12px;
+                min-width: 48px;
+                min-height: 48px;
+                z-index: 102;
+                position: relative;
+                background-color: transparent;
+                border-radius: 8px;
+                touch-action: manipulation;
+                -webkit-tap-highlight-color: rgba(255, 255, 255, 0.2);
+            }
+            
+            .nav-toggle:focus,
+            .nav-toggle:active {
+                outline: 2px solid rgba(255, 255, 255, 0.3);
+                background-color: rgba(255, 255, 255, 0.1);
             }
             
             .nav-links {
@@ -405,7 +420,7 @@
         <div class="header-content">
             <h1 class="app-title">{% block header_title %}KhataPe{% endblock %}</h1>
             
-            <button class="nav-toggle" id="navToggle" aria-label="Open Menu">
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle Navigation Menu" type="button">
                 <i class="fas fa-bars"></i>
             </button>
             
@@ -682,22 +697,75 @@
             console.log('PWA was installed');
         });
         
-        // Mobile navigation functionality
+        // Mobile navigation functionality with improved touch support
         const navToggle = document.getElementById('navToggle');
         const navLinks = document.getElementById('navLinks');
         
-        navToggle.addEventListener('click', () => {
-            navLinks.classList.toggle('active');
-        });
-        
-        // Close mobile menu when clicking outside
-        document.addEventListener('click', (e) => {
-            if (navLinks.classList.contains('active') && 
-                !navLinks.contains(e.target) && 
-                e.target !== navToggle) {
-                navLinks.classList.remove('active');
-            }
-        });
+        if (navToggle && navLinks) {
+            // Improved menu toggle function
+            const toggleMenu = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const isActive = navLinks.classList.contains('active');
+                
+                if (isActive) {
+                    navLinks.classList.remove('active');
+                    navToggle.setAttribute('aria-expanded', 'false');
+                    console.log('Menu closed');
+                } else {
+                    navLinks.classList.add('active');
+                    navToggle.setAttribute('aria-expanded', 'true');
+                    console.log('Menu opened');
+                }
+            };
+            
+            // Add multiple event listeners for better mobile support
+            navToggle.addEventListener('click', toggleMenu, { passive: false });
+            navToggle.addEventListener('touchend', toggleMenu, { passive: false });
+            
+            // Prevent double-firing on devices that support both touch and mouse
+            let touchHandled = false;
+            navToggle.addEventListener('touchstart', (e) => {
+                touchHandled = true;
+                setTimeout(() => { touchHandled = false; }, 300);
+            }, { passive: true });
+            
+            navToggle.addEventListener('mousedown', (e) => {
+                if (touchHandled) {
+                    e.preventDefault();
+                    return;
+                }
+            });
+            
+            // Close mobile menu when clicking/touching outside
+            const closeMenu = (e) => {
+                if (navLinks.classList.contains('active') && 
+                    !navLinks.contains(e.target) && 
+                    e.target !== navToggle && 
+                    !navToggle.contains(e.target)) {
+                    navLinks.classList.remove('active');
+                    navToggle.setAttribute('aria-expanded', 'false');
+                    console.log('Menu closed by outside click');
+                }
+            };
+            
+            document.addEventListener('click', closeMenu);
+            document.addEventListener('touchend', closeMenu);
+            
+            // Close menu when clicking on nav links (for mobile)
+            navLinks.addEventListener('click', (e) => {
+                if (e.target.tagName === 'A') {
+                    navLinks.classList.remove('active');
+                    navToggle.setAttribute('aria-expanded', 'false');
+                    console.log('Menu closed by nav link click');
+                }
+            });
+            
+            // Set initial aria attributes
+            navToggle.setAttribute('aria-expanded', 'false');
+            navToggle.setAttribute('aria-controls', 'navLinks');
+        }
         
         // Auto-hide flash messages after 3 seconds
         document.addEventListener('DOMContentLoaded', () => {
