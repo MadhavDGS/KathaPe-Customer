@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Pending Payments{% endblock %}
+
+{% block header_title %}Pending Payments{% endblock %}
+
+{% block content %}
+<div class="pending-payments-container">
+    <div class="section-header">
+        <h2><i class="fas fa-clock"></i> Payments Awaiting Confirmation</h2>
+        <p class="text-muted">These payments are waiting for business confirmation</p>
+    </div>
+
+    {% if pending_payments %}
+        <div class="pending-payments-list">
+            {% for payment in pending_payments %}
+                <div class="pending-payment-card">
+                    <div class="payment-header">
+                        <div class="business-info">
+                            <h3>{{ payment.business_name }}</h3>
+                            <span class="payment-amount">₹{{ payment.amount }}</span>
+                        </div>
+                        <div class="payment-status">
+                            <span class="status-badge pending">
+                                <i class="fas fa-clock"></i> Pending
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="payment-details">
+                        <div class="detail-row">
+                            <span class="label"><i class="fas fa-calendar"></i> Date:</span>
+                            <span class="value">{{ payment.created_at|datetime }}</span>
+                        </div>
+                        {% if payment.notes %}
+                        <div class="detail-row">
+                            <span class="label"><i class="fas fa-sticky-note"></i> Notes:</span>
+                            <span class="value">{{ payment.notes }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="detail-row">
+                            <span class="label"><i class="fas fa-info-circle"></i> Status:</span>
+                            <span class="value">{{ payment.status.replace('_', ' ').title() }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="payment-actions">
+                        <button onclick="checkPaymentStatus('{{ payment.transaction_id }}')" 
+                                class="btn btn-primary btn-sm">
+                            <i class="fas fa-sync"></i> Check Status
+                        </button>
+                        <a href="{{ url_for('business_view', business_id=payment.business_id) }}" 
+                           class="btn btn-secondary btn-sm">
+                            <i class="fas fa-eye"></i> View Business
+                        </a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <i class="fas fa-check-circle"></i>
+            <h3>No Pending Payments</h3>
+            <p>All your payments have been confirmed!</p>
+            <a href="{{ url_for('customer_dashboard') }}" class="btn btn-primary">
+                <i class="fas fa-home"></i> Back to Dashboard
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.pending-payments-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.section-header h2 {
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.pending-payments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.pending-payment-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    border-left: 4px solid #ffc107;
+}
+
+.payment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.business-info h3 {
+    margin: 0 0 5px 0;
+    color: #333;
+    font-size: 1.2rem;
+}
+
+.payment-amount {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #e74c3c;
+}
+
+.status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.status-badge.pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.payment-details {
+    margin-bottom: 20px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding: 5px 0;
+}
+
+.detail-row .label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.detail-row .value {
+    color: #333;
+    font-weight: 600;
+}
+
+.payment-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-sm {
+    padding: 8px 16px;
+    font-size: 0.875rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: #28a745;
+    margin-bottom: 20px;
+}
+
+.empty-state h3 {
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.empty-state p {
+    color: #6c757d;
+    margin-bottom: 30px;
+}
+
+@media (max-width: 768px) {
+    .payment-header {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .payment-actions {
+        flex-direction: column;
+    }
+    
+    .detail-row {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+</style>
+
+<script>
+function checkPaymentStatus(transactionId) {
+    fetch(`/check_payment_status/${transactionId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (data.status === 'approved') {
+                alert(data.message);
+                window.location.reload(); // Refresh to remove approved payment
+            } else {
+                alert(data.message);
+            }
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to check payment status');
+    });
+}
+</script>
+{% endblock %}

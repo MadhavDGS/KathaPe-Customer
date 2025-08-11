@@ -21,7 +21,15 @@
             <div class="form-group">
                 <label for="amount">Amount (₹)</label>
                 <input type="number" id="amount" name="amount" step="0.01" min="0.01" required
-                       class="form-control amount-input" placeholder="Enter amount">
+                       class="form-control amount-input" placeholder="Enter amount"
+                       {% if transaction_type == 'payment' and current_balance > 0 %}
+                       value="{{ current_balance }}"
+                       {% endif %}>
+                {% if transaction_type == 'payment' and current_balance > 0 %}
+                <small class="form-text text-muted">
+                    <i class="fas fa-info-circle"></i> Current balance: ₹{{ current_balance }} (you can change this amount)
+                </small>
+                {% endif %}
             </div>
 
             <div class="form-group">
@@ -31,6 +39,11 @@
             </div>
 
             <div class="form-actions">
+                {% if transaction_type == 'payment' %}
+                <button type="button" onclick="openPhonePeQR()" class="btn btn-primary phonepe-btn">
+                    <i class="fas fa-qrcode"></i> Pay via PhonePe QR
+                </button>
+                {% endif %}
                 <button type="submit" class="btn btn-primary transaction-btn {{ 'credit-btn' if transaction_type == 'credit' else 'payment-btn' }}">
                     <i class="fas {{ 'fa-arrow-circle-up' if transaction_type == 'credit' else 'fa-arrow-circle-down' }}"></i>
                     {{ 'Take Credit' if transaction_type == 'credit' else 'Make Payment' }}
@@ -42,6 +55,64 @@
         </form>
     </div>
 </div>
+
+<!-- PhonePe QR Payment Modal -->
+{% if transaction_type == 'payment' %}
+<div id="phonepeModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-qrcode"></i> PhonePe QR Payment</h3>
+            <span class="close" onclick="closePhonePeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="phonepeLoading" class="loading-section">
+                <div class="spinner"></div>
+                <h3>Opening PhonePe QR Scanner...</h3>
+                <p>Please wait while we redirect you to PhonePe</p>
+            </div>
+            
+            <div id="phonepeSuccess" class="success-section" style="display: none;">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3>Payment Instructions</h3>
+                <p>1. Scan the merchant's QR code with PhonePe</p>
+                <p>2. Pay <strong>₹<span id="paymentAmount">0</span></strong> to <strong><span id="businessName">Business</span></strong></p>
+                <p>3. Complete the payment in PhonePe app</p>
+                <p>4. Return here when payment is done</p>
+                
+                <div class="modal-actions">
+                    <button onclick="markPaymentDone()" class="btn btn-success">
+                        <i class="fas fa-check"></i> I've Completed Payment
+                    </button>
+                    <button onclick="closePhonePeModal()" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </div>
+            
+            <div id="phonepePending" class="pending-section" style="display: none;">
+                <div class="pending-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <h3>Payment Pending Confirmation</h3>
+                <p>Your payment of <strong>₹<span id="pendingAmount">0</span></strong> has been sent!</p>
+                <p>Waiting for <strong><span id="pendingBusinessName">Business</span></strong> to confirm receipt.</p>
+                <p><i class="fas fa-info-circle"></i> You will be notified once confirmed.</p>
+                
+                <div class="modal-actions">
+                    <button onclick="checkPaymentStatus()" class="btn btn-primary">
+                        <i class="fas fa-sync"></i> Check Status
+                    </button>
+                    <button onclick="goBackToBusiness()" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Business
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <style>
 .transaction-container {
@@ -135,6 +206,16 @@
     text-align: center;
 }
 
+.form-text {
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    color: #6c757d;
+}
+
+.text-muted {
+    color: #6c757d !important;
+}
+
 .form-actions {
     display: flex;
     gap: 15px;
@@ -174,6 +255,146 @@
     transform: translateY(-2px);
 }
 
+.phonepe-btn {
+    background: linear-gradient(135deg, #5f27cd, #341f97);
+    color: white;
+    padding: 15px 25px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-right: 10px;
+}
+
+.phonepe-btn:hover {
+    background: linear-gradient(135deg, #341f97, #2f1b87);
+    transform: translateY(-2px);
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #5f27cd, #341f97);
+    color: white;
+    padding: 20px;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+}
+
+.close {
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    color: white;
+}
+
+.close:hover {
+    opacity: 0.7;
+}
+
+.modal-body {
+    padding: 30px;
+    text-align: center;
+}
+
+.loading-section {
+    text-align: center;
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #5f27cd;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.success-section {
+    text-align: center;
+}
+
+.success-icon {
+    font-size: 3rem;
+    color: #28a745;
+    margin-bottom: 20px;
+}
+
+.pending-section {
+    text-align: center;
+}
+
+.pending-icon {
+    font-size: 3rem;
+    color: #ffc107;
+    margin-bottom: 20px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.modal-actions {
+    margin-top: 25px;
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #218838, #1ea085);
+    transform: translateY(-2px);
+}
+
 .btn-secondary {
     background: #6c757d;
     color: white;
@@ -199,9 +420,152 @@
         flex-direction: column;
     }
     
-    .transaction-btn {
+    .transaction-btn, .phonepe-btn {
         min-width: auto;
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+    
+    .modal-content {
+        width: 95%;
+        margin: 10% auto;
     }
 }
 </style>
+
+<script>
+let currentTransactionId = null;
+
+function openPhonePeQR() {
+    const amount = document.getElementById('amount').value;
+    const notes = document.getElementById('notes').value;
+    
+    if (!amount || amount <= 0) {
+        alert('Please enter a valid amount');
+        return;
+    }
+    
+    // Show modal
+    document.getElementById('phonepeModal').style.display = 'block';
+    document.getElementById('phonepeLoading').style.display = 'block';
+    document.getElementById('phonepeSuccess').style.display = 'none';
+    document.getElementById('phonepePending').style.display = 'none';
+    
+    // Make AJAX request to initiate PhonePe payment
+    fetch(`/phonepe_qr_payment/{{ business.id }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `amount=${amount}&notes=${encodeURIComponent(notes)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currentTransactionId = data.transaction_id;
+            
+            // Update payment details in modal
+            document.getElementById('paymentAmount').textContent = data.amount;
+            document.getElementById('businessName').textContent = data.business_name;
+            document.getElementById('pendingAmount').textContent = data.amount;
+            document.getElementById('pendingBusinessName').textContent = data.business_name;
+            
+            // Try to open PhonePe
+            try {
+                window.location.href = data.phonepe_url;
+            } catch (error) {
+                console.log('Could not open PhonePe app:', error);
+            }
+            
+            // Show success screen after 2 seconds
+            setTimeout(() => {
+                document.getElementById('phonepeLoading').style.display = 'none';
+                document.getElementById('phonepeSuccess').style.display = 'block';
+            }, 2000);
+            
+        } else {
+            alert('Error: ' + data.error);
+            closePhonePeModal();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to initiate PhonePe payment');
+        closePhonePeModal();
+    });
+}
+
+function closePhonePeModal() {
+    document.getElementById('phonepeModal').style.display = 'none';
+    currentTransactionId = null;
+}
+
+function markPaymentDone() {
+    if (!currentTransactionId) {
+        alert('No pending transaction found');
+        return;
+    }
+    
+    fetch(`/complete_phonepe_payment/${currentTransactionId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show pending confirmation screen
+            document.getElementById('phonepeSuccess').style.display = 'none';
+            document.getElementById('phonepePending').style.display = 'block';
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to mark payment as done');
+    });
+}
+
+function checkPaymentStatus() {
+    if (!currentTransactionId) {
+        alert('No pending transaction found');
+        return;
+    }
+    
+    fetch(`/check_payment_status/${currentTransactionId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (data.status === 'approved') {
+                alert(data.message);
+                closePhonePeModal();
+                window.location.reload(); // Refresh to show updated balance
+            } else {
+                alert(data.message);
+            }
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to check payment status');
+    });
+}
+
+function goBackToBusiness() {
+    closePhonePeModal();
+    window.location.href = `/business/{{ business.id }}`;
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+    const modal = document.getElementById('phonepeModal');
+    if (event.target == modal) {
+        closePhonePeModal();
+    }
+}
+</script>
 {% endblock %}
