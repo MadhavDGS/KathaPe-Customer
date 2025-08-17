@@ -78,14 +78,24 @@
                             {% if '📷 Bill Photo:' in notes %}
                                 {% set parts = notes.split('📷 Bill Photo:') %}
                                 {{ parts[0].strip() if parts[0].strip() else 'No additional notes' }}
-                                <div class="transaction-bill-photo">
-                                    <a href="{{ parts[1].strip() }}" target="_blank" class="bill-photo-link">
-                                        <i class="fas fa-camera"></i> View Bill Photo
-                                    </a>
-                                </div>
                             {% else %}
                                 {{ notes }}
                             {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Handle bill photos from both receipt_image_url field and notes -->
+                        {% set bill_photo_url = transaction.get('receipt_image_url') %}
+                        {% if not bill_photo_url and transaction.get('notes') and '📷 Bill Photo:' in transaction.get('notes') %}
+                            {% set parts = transaction.get('notes').split('📷 Bill Photo:') %}
+                            {% set bill_photo_url = parts[1].strip() %}
+                        {% endif %}
+                        
+                        {% if bill_photo_url %}
+                        <div class="transaction-bill-photo">
+                            <a href="{{ bill_photo_url }}" target="_blank" class="bill-photo-link">
+                                <i class="fas fa-camera"></i> View Bill Photo
+                            </a>
                         </div>
                         {% endif %}
                     </div>

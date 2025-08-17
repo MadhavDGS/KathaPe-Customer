@@ -547,8 +547,8 @@ def customer_transaction(transaction_type, business_id):
                         filepath = os.path.join(upload_path, filename)
                         file.save(filepath)
                         
-                        # Store relative URL for database
-                        bill_photo_url = f"/static/uploads/bills/{filename}"
+                        # Store URL that uses our protected route
+                        bill_photo_url = f"/uploads/bills/{filename}"
                         print(f"DEBUG: Bill photo saved to {bill_photo_url}")
                         
                     except Exception as e:
@@ -584,12 +584,9 @@ def customer_transaction(transaction_type, business_id):
                 'created_at': get_ist_isoformat()
             }
             
-            # Add bill photo URL to notes if available (temporary solution)
+            # Add bill photo URL if available
             if bill_photo_url:
-                if notes:
-                    transaction_data['notes'] = f"{notes}\n\n📷 Bill Photo: {bill_photo_url}"
-                else:
-                    transaction_data['notes'] = f"📷 Bill Photo: {bill_photo_url}"
+                transaction_data['receipt_image_url'] = bill_photo_url
             
             print(f"DEBUG: Transaction data: {transaction_data}")
             
