@@ -515,9 +515,20 @@ function markPaymentDone() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Show pending confirmation screen
-            document.getElementById('phonepeSuccess').style.display = 'none';
-            document.getElementById('phonepePending').style.display = 'block';
+            if (data.status === 'confirmed') {
+                // Payment automatically confirmed, show success and redirect
+                alert(data.message);
+                closePhonePeModal();
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    window.location.reload();
+                }
+            } else {
+                // Show pending confirmation screen (fallback)
+                document.getElementById('phonepeSuccess').style.display = 'none';
+                document.getElementById('phonepePending').style.display = 'block';
+            }
         } else {
             alert('Error: ' + data.error);
         }

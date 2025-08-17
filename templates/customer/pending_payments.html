@@ -7,8 +7,8 @@
 {% block content %}
 <div class="pending-payments-container">
     <div class="section-header">
-        <h2><i class="fas fa-clock"></i> Payments Awaiting Confirmation</h2>
-        <p class="text-muted">These payments are waiting for business confirmation</p>
+        <h2><i class="fas fa-clock"></i> Processing Payments</h2>
+        <p class="text-muted">These payments are being processed automatically</p>
     </div>
 
     {% if pending_payments %}
@@ -45,10 +45,6 @@
                     </div>
                     
                     <div class="payment-actions">
-                        <button onclick="checkPaymentStatus('{{ payment.transaction_id }}')" 
-                                class="btn btn-primary btn-sm">
-                            <i class="fas fa-sync"></i> Check Status
-                        </button>
                         <a href="{{ url_for('business_view', business_id=payment.business_id) }}" 
                            class="btn btn-secondary btn-sm">
                             <i class="fas fa-eye"></i> View Business
@@ -60,8 +56,8 @@
     {% else %}
         <div class="empty-state">
             <i class="fas fa-check-circle"></i>
-            <h3>No Pending Payments</h3>
-            <p>All your payments have been confirmed!</p>
+            <h3>No Processing Payments</h3>
+            <p>All your payments have been processed automatically!</p>
             <a href="{{ url_for('customer_dashboard') }}" class="btn btn-primary">
                 <i class="fas fa-home"></i> Back to Dashboard
             </a>
@@ -201,26 +197,4 @@
 }
 </style>
 
-<script>
-function checkPaymentStatus(transactionId) {
-    fetch(`/check_payment_status/${transactionId}`)
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            if (data.status === 'approved') {
-                alert(data.message);
-                window.location.reload(); // Refresh to remove approved payment
-            } else {
-                alert(data.message);
-            }
-        } else {
-            alert('Error: ' + data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Failed to check payment status');
-    });
-}
-</script>
 {% endblock %}

@@ -680,7 +680,7 @@ def phonepe_qr_payment(business_id):
 @login_required
 @customer_required
 def complete_phonepe_payment(transaction_id):
-    """Mark PhonePe payment as completed by customer, pending business approval"""
+    """Complete PhonePe payment and directly add to transactions"""
     try:
         # Get pending payment from session
         pending_payment = session.get(f'pending_payment_{transaction_id}')
@@ -688,16 +688,31 @@ def complete_phonepe_payment(transaction_id):
         if not pending_payment:
             return jsonify({'success': False, 'error': 'Invalid transaction'}), 400
         
-        # Update status to indicate customer completed payment
-        pending_payment['status'] = 'paid_pending_approval'
-        pending_payment['completed_at'] = get_ist_isoformat()
-        session[f'pending_payment_{transaction_id}'] = pending_payment
+        # Directly add payment to transactions table
+        transaction_data = {
+            'id': str(uuid.uuid4()),
+            'customer_id': pending_payment['customer_id'],
+            'business_id': pending_payment['business_id'],
+            'transaction_type': 'payment',
+            'amount': pending_payment['amount'],
+            'notes': pending_payment.get('notes', 'PhonePe QR Payment'),
+            'created_at': get_ist_isoformat()
+        }
+        
+        # Insert transaction into database
+        insert_result = query_table('transactions', query_type='insert', data=transaction_data)
+        
+        if not insert_result:
+            return jsonify({'success': False, 'error': 'Failed to add transaction'}), 500
+        
+        # Remove pending payment from session
+        del session[f'pending_payment_{transaction_id}']
         
         return jsonify({
             'success': True,
-            'message': f'Payment completed! Waiting for {pending_payment["business_name"]} to confirm receipt of ₹{pending_payment["amount"]}.',
-            'status': 'paid_pending_approval',
-            'redirect_url': url_for('business_view', business_id=pending_payment['business_id'])
+            'message': f'Payment of ₹{pending_payment["amount"]} completed successfully!',
+            'status': 'confirmed',
+            'redirect_url': url_for('customer_dashboard')
         })
             
     except Exception as e:
@@ -722,44 +737,6 @@ def pending_payments():
     pending_payments.sort(key=lambda x: x.get('created_at', ''), reverse=True)
     
     return render_template('customer/pending_payments.html', pending_payments=pending_payments)
-
-@customer_app.route('/check_payment_status/<transaction_id>')
-@login_required
-@customer_required
-def check_payment_status(transaction_id):
-    """Check if a pending payment has been approved by business"""
-    try:
-        # Check if transaction has been approved and moved to main transactions table
-        transaction_response = query_table('transactions', filters=[('id', 'eq', transaction_id)])
-        
-        if transaction_response and transaction_response.data:
-            # Payment has been approved and recorded
-            # Clean up pending payment from session
-            session.pop(f'pending_payment_{transaction_id}', None)
-            
-            return jsonify({
-                'success': True,
-                'status': 'approved',
-                'message': 'Payment has been confirmed by the business!'
-            })
-        else:
-            # Still pending
-            pending_payment = session.get(f'pending_payment_{transaction_id}')
-            if pending_payment:
-                return jsonify({
-                    'success': True,
-                    'status': pending_payment.get('status', 'pending_business_approval'),
-                    'message': 'Payment is still pending business confirmation.'
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'error': 'Payment not found'
-                })
-            
-    except Exception as e:
-        print(f"Error checking payment status: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 @customer_app.route('/transaction_history')
 @login_required
