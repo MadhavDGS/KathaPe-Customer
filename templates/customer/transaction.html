@@ -39,26 +39,33 @@
             </div>
 
             <div class="form-group">
-                <label for="bill_photo" class="form-label">
+                <label for="bill_photo">
                     <i class="fas fa-camera"></i> Bill Photo (Optional)
                 </label>
-                <input type="file" 
-                       id="bill_photo" 
-                       name="bill_photo" 
-                       class="form-control" 
-                       accept="image/*" 
-                       capture="camera">
-                <small class="form-text text-muted">
-                    Take a photo of your bill for record keeping
-                </small>
-            </div>
-
-            <!-- Photo Preview -->
-            <div id="photo-preview" class="photo-preview" style="display: none;">
-                <img id="preview-image" src="" alt="Bill preview" class="preview-image">
-                <button type="button" id="remove-photo" class="btn btn-sm btn-danger">
-                    <i class="fas fa-times"></i> Remove Photo
-                </button>
+                <div class="file-upload-container">
+                    <input type="file" id="bill_photo" name="bill_photo" 
+                           accept="image/*" capture="environment" class="form-control file-input"
+                           onchange="previewBillPhoto(this)">
+                    <div class="file-upload-preview" id="billPhotoPreview" style="display: none;">
+                        <img id="previewImage" src="" alt="Bill Preview" class="preview-image">
+                        <button type="button" onclick="removeBillPhoto()" class="btn-remove-photo">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="file-upload-hint">
+                        <i class="fas fa-camera"></i>
+                        <span>Take Photo or Upload Image</span>
+                        <small>(PNG, JPG, JPEG, GIF - Max 16MB)</small>
+                        <div class="upload-buttons">
+                            <button type="button" onclick="takePicture()" class="btn-camera">
+                                <i class="fas fa-camera"></i> Take Photo
+                            </button>
+                            <button type="button" onclick="document.getElementById('bill_photo').click()" class="btn-upload">
+                                <i class="fas fa-upload"></i> Upload File
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="form-actions">
@@ -237,6 +244,121 @@
 
 .text-muted {
     color: #6c757d !important;
+}
+
+/* File upload styles */
+.file-upload-container {
+    position: relative;
+    border: 2px dashed #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    transition: border-color 0.3s ease;
+    background: #f8f9fa;
+}
+
+.file-upload-container:hover {
+    border-color: #5c67de;
+    background: #f0f2ff;
+}
+
+.file-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.file-upload-hint {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    color: #6c757d;
+    font-size: 0.9rem;
+    pointer-events: none;
+}
+
+.file-upload-hint i {
+    font-size: 2rem;
+    color: #5c67de;
+}
+
+.upload-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    pointer-events: all;
+}
+
+.btn-camera, .btn-upload {
+    padding: 8px 16px;
+    border: 2px solid #5c67de;
+    background: transparent;
+    color: #5c67de;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+}
+
+.btn-camera:hover, .btn-upload:hover {
+    background: #5c67de;
+    color: white;
+}
+
+.btn-camera {
+    border-color: #28a745;
+    color: #28a745;
+}
+
+.btn-camera:hover {
+    background: #28a745;
+    color: white;
+}
+
+.file-upload-preview {
+    position: relative;
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.preview-image {
+    width: 100%;
+    max-height: 200px;
+    object-fit: cover;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.btn-remove-photo {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #dc3545;
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.btn-remove-photo:hover {
+    background: #c82333;
+    transform: scale(1.1);
 }
 
 .form-actions {
@@ -632,6 +754,140 @@ function checkPaymentStatus() {
 function goBackToBusiness() {
     closePhonePeModal();
     window.location.href = `/business/{{ business.id }}`;
+}
+
+// Bill photo preview functions
+function takePicture() {
+    const input = document.getElementById('bill_photo');
+    
+    // For mobile devices, trigger the camera directly
+    if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        input.click();
+        return;
+    }
+    
+    // For desktop, use camera API if available
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        // Create camera modal
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 9999; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+        `;
+        
+        const video = document.createElement('video');
+        video.style.cssText = 'width: 90%; max-width: 500px; height: auto;';
+        video.autoplay = true;
+        
+        const canvas = document.createElement('canvas');
+        canvas.style.display = 'none';
+        
+        const captureBtn = document.createElement('button');
+        captureBtn.innerHTML = '<i class="fas fa-camera"></i> Capture Photo';
+        captureBtn.style.cssText = `
+            margin: 20px; padding: 15px 30px; background: #28a745; color: white;
+            border: none; border-radius: 8px; font-size: 16px; cursor: pointer;
+        `;
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+        closeBtn.style.cssText = `
+            margin: 20px; padding: 15px 30px; background: #dc3545; color: white;
+            border: none; border-radius: 8px; font-size: 16px; cursor: pointer;
+        `;
+        
+        modal.appendChild(video);
+        modal.appendChild(captureBtn);
+        modal.appendChild(closeBtn);
+        modal.appendChild(canvas);
+        document.body.appendChild(modal);
+        
+        // Start camera
+        navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'environment' // Use back camera on mobile
+            } 
+        })
+        .then(stream => {
+            video.srcObject = stream;
+            
+            captureBtn.onclick = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                
+                canvas.toBlob(blob => {
+                    const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    input.files = dataTransfer.files;
+                    
+                    previewBillPhoto(input);
+                    
+                    // Clean up
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(modal);
+                }, 'image/jpeg', 0.8);
+            };
+            
+            closeBtn.onclick = () => {
+                stream.getTracks().forEach(track => track.stop());
+                document.body.removeChild(modal);
+            };
+        })
+        .catch(err => {
+            console.error('Camera error:', err);
+            document.body.removeChild(modal);
+            alert('Unable to access camera. Please use file upload instead.');
+        });
+    } else {
+        // Fallback to file input
+        input.click();
+    }
+}
+
+function previewBillPhoto(input) {
+    const preview = document.getElementById('billPhotoPreview');
+    const previewImage = document.getElementById('previewImage');
+    const hint = input.parentElement.querySelector('.file-upload-hint');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Check file size (16MB limit)
+        if (file.size > 16 * 1024 * 1024) {
+            alert('File size must be less than 16MB');
+            input.value = '';
+            return;
+        }
+        
+        // Check file type
+        const allowedTypes = ['image/png', 'image/jpg', 'image/jpeg', 'image/gif'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Please upload only PNG, JPG, JPEG, or GIF files');
+            input.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImage.src = e.target.result;
+            preview.style.display = 'block';
+            hint.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function removeBillPhoto() {
+    const input = document.getElementById('bill_photo');
+    const preview = document.getElementById('billPhotoPreview');
+    const hint = input.parentElement.querySelector('.file-upload-hint');
+    
+    input.value = '';
+    preview.style.display = 'none';
+    hint.style.display = 'flex';
 }
 
 // Close modal when clicking outside of it
