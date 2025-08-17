@@ -92,10 +92,10 @@
                         {% endif %}
                         
                         {% if bill_photo_url %}
-                        <div class="transaction-bill-photo">
-                            <a href="{{ bill_photo_url }}" target="_blank" class="bill-photo-link">
-                                <i class="fas fa-camera"></i> View Bill Photo
-                            </a>
+                        <div class="bill-photo-container">
+                            <button data-transaction-id="{{ transaction.get('id') }}" onclick="showBillPhoto(this.dataset.transactionId)" class="btn-bill-photo">
+                                <i class="fas fa-receipt"></i> View Bill
+                            </button>
                         </div>
                         {% endif %}
                     </div>
@@ -107,6 +107,33 @@
                 <p>No transactions yet.</p>
             </div>
         {% endif %}
+    </div>
+</div>
+
+<!-- Bill Photo Modal -->
+<div id="billPhotoModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-receipt"></i> Bill Photo</h3>
+            <span class="close" onclick="closeBillPhotoModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="billPhotoLoading" class="loading-section">
+                <div class="spinner"></div>
+                <h3>Loading bill photo...</h3>
+            </div>
+            <div id="billPhotoContent" class="bill-photo-section" style="display: none;">
+                <img id="billPhotoImage" src="" alt="Bill Photo" class="bill-photo-image">
+                <div class="bill-photo-actions">
+                    <button onclick="downloadBillPhoto()" class="btn btn-primary">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                    <button onclick="closeBillPhotoModal()" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -463,6 +490,158 @@ body {
     font-size: 16px;
 }
 
+/* Bill photo styles */
+.bill-photo-container {
+    margin-top: 8px;
+    position: relative;
+    z-index: 1;
+}
+
+.btn-bill-photo {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
+}
+
+.btn-bill-photo:hover {
+    background: #4c59c8;
+    transform: translateY(-1px);
+}
+
+/* Modal styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: var(--box-shadow);
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.close {
+    color: var(--text-muted);
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover {
+    color: var(--text-color);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.loading-section {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.bill-photo-section {
+    text-align: center;
+}
+
+.bill-photo-image {
+    max-width: 100%;
+    max-height: 70vh;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.bill-photo-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.bill-photo-actions .btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #4c59c8;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
 @media (min-width: 768px) {
     .action-buttons {
         flex-direction: row;
@@ -490,4 +669,71 @@ body {
 {% endblock %}
 
 {% block scripts %}
+<script>
+let currentBillPhotoUrl = '';
+
+function showBillPhoto(transactionId) {
+    console.log('showBillPhoto called with:', transactionId);
+    const modal = document.getElementById('billPhotoModal');
+    const loading = document.getElementById('billPhotoLoading');
+    const content = document.getElementById('billPhotoContent');
+    const image = document.getElementById('billPhotoImage');
+    
+    console.log('Modal elements:', {modal, loading, content, image});
+    
+    if (!modal) {
+        console.error('Modal not found!');
+        return;
+    }
+    
+    // Show modal and loading state
+    modal.style.display = 'block';
+    loading.style.display = 'block';
+    content.style.display = 'none';
+    
+    // Load bill photo
+    const billPhotoUrl = `/transaction/bill/${transactionId}`;
+    currentBillPhotoUrl = billPhotoUrl;
+    
+    console.log('Loading bill photo from:', billPhotoUrl);
+    
+    // Create a new image element to preload
+    const img = new Image();
+    img.onload = function() {
+        console.log('Bill photo loaded successfully');
+        image.src = billPhotoUrl;
+        loading.style.display = 'none';
+        content.style.display = 'block';
+    };
+    img.onerror = function() {
+        console.error('Failed to load bill photo');
+        loading.innerHTML = '<p>Failed to load bill photo</p>';
+    };
+    img.src = billPhotoUrl;
+}
+
+function closeBillPhotoModal() {
+    document.getElementById('billPhotoModal').style.display = 'none';
+    currentBillPhotoUrl = '';
+}
+
+function downloadBillPhoto() {
+    if (currentBillPhotoUrl) {
+        const link = document.createElement('a');
+        link.href = currentBillPhotoUrl;
+        link.download = `bill_photo_${Date.now()}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+    const modal = document.getElementById('billPhotoModal');
+    if (event.target == modal) {
+        closeBillPhotoModal();
+    }
+}
+</script>
 {% endblock %} 
