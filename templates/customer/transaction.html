@@ -17,7 +17,7 @@
             <h3>{{ 'Take Credit' if transaction_type == 'credit' else 'Make Payment' }}</h3>
         </div>
 
-        <form method="POST" class="transaction-form">
+        <form method="POST" class="transaction-form" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="amount">Amount (₹)</label>
                 <input type="number" id="amount" name="amount" step="0.01" min="0.01" required
@@ -36,6 +36,29 @@
                 <label for="notes">Notes (Optional)</label>
                 <textarea id="notes" name="notes" class="form-control" rows="3" 
                          placeholder="Add a note about this transaction..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="bill_photo" class="form-label">
+                    <i class="fas fa-camera"></i> Bill Photo (Optional)
+                </label>
+                <input type="file" 
+                       id="bill_photo" 
+                       name="bill_photo" 
+                       class="form-control" 
+                       accept="image/*" 
+                       capture="camera">
+                <small class="form-text text-muted">
+                    Take a photo of your bill for record keeping
+                </small>
+            </div>
+
+            <!-- Photo Preview -->
+            <div id="photo-preview" class="photo-preview" style="display: none;">
+                <img id="preview-image" src="" alt="Bill preview" class="preview-image">
+                <button type="button" id="remove-photo" class="btn btn-sm btn-danger">
+                    <i class="fas fa-times"></i> Remove Photo
+                </button>
             </div>
 
             <div class="form-actions">
@@ -431,6 +454,46 @@
         margin: 10% auto;
     }
 }
+
+/* Photo Preview Styles */
+.photo-preview {
+    margin-top: 15px;
+    text-align: center;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    background-color: #f8f9fa;
+}
+
+.preview-image {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 10px;
+}
+
+.form-control[type="file"] {
+    padding: 8px;
+    border: 2px dashed #dee2e6;
+    background-color: #f8f9fa;
+}
+
+.form-control[type="file"]:focus {
+    border-color: #5c67de;
+    box-shadow: 0 0 0 0.2rem rgba(92, 103, 222, 0.25);
+}
+
+.form-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.875rem;
+}
 </style>
 
 <script>
@@ -578,5 +641,23 @@ window.onclick = function(event) {
         closePhonePeModal();
     }
 }
+
+// Photo preview functionality
+document.getElementById('bill_photo').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('preview-image').src = e.target.result;
+            document.getElementById('photo-preview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+document.getElementById('remove-photo').addEventListener('click', function() {
+    document.getElementById('bill_photo').value = '';
+    document.getElementById('photo-preview').style.display = 'none';
+});
 </script>
 {% endblock %}

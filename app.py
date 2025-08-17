@@ -3,6 +3,18 @@ Customer Flask Application - Handles all customer-related operations
 """
 from common_utils import *
 from common_utils import get_ist_isoformat, get_ist_now
+import os
+import datetime
+from werkzeug.utils import secure_filename
+
+# File upload configuration
+UPLOAD_FOLDER = 'static/uploads/bills'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB
+
+def allowed_file(filename):
+    """Check if the uploaded file has an allowed extension"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Create the customer Flask app
 customer_app = create_app('KhataPe-Customer')
@@ -515,13 +527,48 @@ def customer_transaction(transaction_type, business_id):
         amount = request.form.get('amount')
         notes = request.form.get('notes', '')
         
+        # Handle file upload for bill photo
+        bill_photo_url = None
+        if 'bill_photo' in request.files:
+            file = request.files['bill_photo']
+            if file and file.filename != '':
+                if allowed_file(file.filename):
+                    try:
+                        # Create filename with timestamp and customer info
+                        filename = secure_filename(file.filename)
+                        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                        filename = f"{timestamp}_{customer_id[:8]}_{filename}"
+                        
+                        # Ensure upload directory exists
+                        upload_path = os.path.join(UPLOAD_FOLDER)
+                        os.makedirs(upload_path, exist_ok=True)
+                        
+                        # Save file
+                        filepath = os.path.join(upload_path, filename)
+                        file.save(filepath)
+                        
+                        # Store relative URL for database
+                        bill_photo_url = f"/static/uploads/bills/{filename}"
+                        print(f"DEBUG: Bill photo saved to {bill_photo_url}")
+                        
+                    except Exception as e:
+                        print(f"ERROR: Failed to save bill photo: {e}")
+                        flash('Failed to save bill photo, but transaction will continue', 'warning')
+                else:
+                    flash('Invalid file type. Please upload PNG, JPG, JPEG, or GIF files only.', 'error')
+                    return render_template('customer/transaction.html', 
+                                         business=business, 
+                                         transaction_type=transaction_type,
+                                         current_balance=current_balance)
+        
         try:
             amount = float(amount) if amount else 0
             if amount <= 0:
                 flash('Please enter a valid amount', 'error')
                 return render_template('customer/transaction.html', 
                                      business=business, 
-                                     transaction_type=transaction_type)
+                                     transaction_type=transaction_type,
+                                     current_balance=current_balance)
             
             # Debug logging
             print(f"DEBUG: Creating transaction - customer_id: {customer_id}, business_id: {business_id}, type: {transaction_type}, amount: {amount}")
@@ -536,6 +583,13 @@ def customer_transaction(transaction_type, business_id):
                 'notes': notes,
                 'created_at': get_ist_isoformat()
             }
+            
+            # Add bill photo URL to notes if available (temporary solution)
+            if bill_photo_url:
+                if notes:
+                    transaction_data['notes'] = f"{notes}\n\n📷 Bill Photo: {bill_photo_url}"
+                else:
+                    transaction_data['notes'] = f"📷 Bill Photo: {bill_photo_url}"
             
             print(f"DEBUG: Transaction data: {transaction_data}")
             
@@ -771,6 +825,13 @@ def logout():
 @customer_app.route('/favicon.ico')
 def favicon():
     return send_from_directory('static', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
+@customer_app.route('/uploads/bills/<filename>')
+@login_required
+@customer_required
+def uploaded_bill(filename):
+    """Serve uploaded bill images (protected route)"""
+    return send_from_directory(UPLOAD_FOLDER, filename)
 
 # Error handling
 @customer_app.errorhandler(404)

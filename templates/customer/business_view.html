@@ -74,7 +74,18 @@
                         </div>
                         {% if transaction.get('notes') %}
                         <div class="transaction-notes">
-                            {{ transaction.get('notes') }}
+                            {% set notes = transaction.get('notes') %}
+                            {% if '📷 Bill Photo:' in notes %}
+                                {% set parts = notes.split('📷 Bill Photo:') %}
+                                {{ parts[0].strip() if parts[0].strip() else 'No additional notes' }}
+                                <div class="transaction-bill-photo">
+                                    <a href="{{ parts[1].strip() }}" target="_blank" class="bill-photo-link">
+                                        <i class="fas fa-camera"></i> View Bill Photo
+                                    </a>
+                                </div>
+                            {% else %}
+                                {{ notes }}
+                            {% endif %}
                         </div>
                         {% endif %}
                     </div>
@@ -392,6 +403,32 @@ body {
 .transaction-notes {
     font-size: 14px;
     color: var(--text-muted);
+}
+
+.transaction-bill-photo {
+    margin-top: 8px;
+}
+
+.bill-photo-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    background-color: #e3f2fd;
+    color: #1976d2;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 12px;
+    transition: background-color 0.2s;
+}
+
+.bill-photo-link:hover {
+    background-color: #bbdefb;
+    text-decoration: none;
+}
+
+.bill-photo-link i {
+    font-size: 10px;
 }
 
 .empty-state {
