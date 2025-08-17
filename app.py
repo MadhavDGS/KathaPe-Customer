@@ -4,6 +4,7 @@ Customer Flask Application - Handles all customer-related operations
 from common_utils import *
 from common_utils import get_ist_isoformat, get_ist_now
 import os
+import json
 import datetime
 from werkzeug.utils import secure_filename
 
@@ -528,32 +529,62 @@ def customer_transaction(transaction_type, business_id):
         notes = request.form.get('notes', '')
         
         # Handle file upload for bill photo
-        bill_photo_url = None
+        bill_photo_data = None
         if 'bill_photo' in request.files:
             file = request.files['bill_photo']
             if file and file.filename != '':
                 if allowed_file(file.filename):
                     try:
-                        # Create filename with timestamp and customer info
-                        filename = secure_filename(file.filename)
-                        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                        filename = f"{timestamp}_{customer_id[:8]}_{filename}"
+                        # Read file data
+                        file.seek(0)  # Reset file pointer
+                        file_data = file.read()
                         
-                        # Ensure upload directory exists
-                        upload_path = os.path.join(UPLOAD_FOLDER)
-                        os.makedirs(upload_path, exist_ok=True)
+                        # Compress image before storing in database
+                        from PIL import Image
+                        import io
+                        import base64
                         
-                        # Save file
-                        filepath = os.path.join(upload_path, filename)
-                        file.save(filepath)
+                        # Open and compress the image
+                        original_image = Image.open(io.BytesIO(file_data))
                         
-                        # Store URL that uses our protected route
-                        bill_photo_url = f"/uploads/bills/{filename}"
-                        print(f"DEBUG: Bill photo saved to {bill_photo_url}")
+                        # Convert to RGB if necessary (for JPEG compatibility)
+                        if original_image.mode in ('RGBA', 'LA', 'P'):
+                            original_image = original_image.convert('RGB')
+                        
+                        # Start with high quality and reduce if needed
+                        for quality in [85, 70, 55, 40]:
+                            output = io.BytesIO()
+                            original_image.save(output, format='JPEG', quality=quality, optimize=True)
+                            compressed_data = output.getvalue()
+                            
+                            # If compressed size is acceptable, break
+                            if len(compressed_data) < 500 * 1024:  # 500KB limit for database
+                                break
+                            
+                            # If still too large, resize image
+                            if quality == 40:
+                                width, height = original_image.size
+                                if width > 800 or height > 800:
+                                    original_image.thumbnail((800, 800), Image.Resampling.LANCZOS)
+                                    output = io.BytesIO()
+                                    original_image.save(output, format='JPEG', quality=70, optimize=True)
+                                    compressed_data = output.getvalue()
+                        
+                        # Final size check
+                        if len(compressed_data) > 1024 * 1024:  # 1MB final limit
+                            flash('Unable to compress image small enough. Please use a smaller image.', 'error')
+                            return render_template('customer/transaction.html', 
+                                                 business=business, 
+                                                 transaction_type=transaction_type,
+                                                 current_balance=current_balance)
+                        
+                        # Convert to base64 for database storage
+                        bill_photo_data = base64.b64encode(compressed_data).decode('utf-8')
+                        print(f"DEBUG: Bill photo compressed and encoded to base64, size: {len(bill_photo_data)} characters")
                         
                     except Exception as e:
-                        print(f"ERROR: Failed to save bill photo: {e}")
-                        flash('Failed to save bill photo, but transaction will continue', 'warning')
+                        print(f"ERROR: Failed to process bill photo: {e}")
+                        flash('Failed to process bill photo, but transaction will continue', 'warning')
                 else:
                     flash('Invalid file type. Please upload PNG, JPG, JPEG, or GIF files only.', 'error')
                     return render_template('customer/transaction.html', 
@@ -584,9 +615,9 @@ def customer_transaction(transaction_type, business_id):
                 'created_at': get_ist_isoformat()
             }
             
-            # Add bill photo URL if available
-            if bill_photo_url:
-                transaction_data['receipt_image_url'] = bill_photo_url
+            # Add bill photo data if available
+            if bill_photo_data:
+                transaction_data['receipt_image_url'] = bill_photo_data
             
             print(f"DEBUG: Transaction data: {transaction_data}")
             
@@ -827,8 +858,143 @@ def favicon():
 @login_required
 @customer_required
 def uploaded_bill(filename):
-    """Serve uploaded bill images (protected route)"""
-    return send_from_directory(UPLOAD_FOLDER, filename)
+    """Serve uploaded bill images (protected route) - DEPRECATED"""
+    return "Image not found - please use new database storage", 404
+
+@customer_app.route('/debug/bill/<transaction_id>')
+@login_required
+def debug_bill_info(transaction_id):
+    """Debug route to check bill photo information"""
+    try:
+        # Get the transaction with bill photo data
+        transaction_result = query_table('transactions', 
+                                       filters=[('id', 'eq', transaction_id)])
+        
+        if not transaction_result or not transaction_result.data:
+            return f"Transaction {transaction_id} not found in database", 404
+            
+        transaction = transaction_result.data[0]
+        bill_photo_data = transaction.get('receipt_image_url')
+        
+        debug_info = {
+            'transaction_id': transaction_id,
+            'has_bill_photo': bool(bill_photo_data),
+            'bill_data_length': len(bill_photo_data) if bill_photo_data else 0,
+            'bill_data_preview': bill_photo_data[:50] + '...' if bill_photo_data and len(bill_photo_data) > 50 else bill_photo_data,
+            'transaction_amount': transaction.get('amount'),
+            'transaction_date': transaction.get('created_at')
+        }
+        
+        return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
+        
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+
+@customer_app.route('/transaction/bill/<transaction_id>')
+@login_required
+def serve_bill_from_database(transaction_id):
+    """Serve bill photo directly from database"""
+    try:
+        import base64
+        from flask import Response
+        
+        print(f"DEBUG: Serving bill for transaction {transaction_id}")
+        
+        # Get the transaction with bill photo data
+        transaction_result = query_table('transactions', 
+                                       filters=[('id', 'eq', transaction_id)])
+        
+        if not transaction_result or not transaction_result.data:
+            print(f"DEBUG: Transaction {transaction_id} not found")
+            return "Transaction not found", 404
+            
+        transaction = transaction_result.data[0]
+        bill_photo_data = transaction.get('receipt_image_url')
+        
+        if not bill_photo_data:
+            print(f"DEBUG: No bill photo data for transaction {transaction_id}")
+            return "No bill photo found", 404
+            
+        # Check if data is base64 encoded or old file path
+        if bill_photo_data.startswith('/uploads/bills/'):
+            print(f"DEBUG: Old file format for transaction {transaction_id}")
+            return "Old file format not supported", 404
+            
+        print(f"DEBUG: Found bill photo data, size: {len(bill_photo_data)} characters")
+        
+        # Decode base64 image data
+        try:
+            image_data = base64.b64decode(bill_photo_data)
+            print(f"DEBUG: Decoded image data, size: {len(image_data)} bytes")
+            
+            # Determine content type based on image signature
+            content_type = 'image/jpeg'  # Default
+            if image_data.startswith(b'\x89PNG'):
+                content_type = 'image/png'
+            elif image_data.startswith(b'GIF'):
+                content_type = 'image/gif'
+            elif image_data.startswith(b'\xff\xd8'):
+                content_type = 'image/jpeg'
+                
+            print(f"DEBUG: Serving image as {content_type}")
+            return Response(image_data, mimetype=content_type)
+            
+        except Exception as e:
+            print(f"ERROR: Failed to decode image data: {e}")
+            return f"Invalid image data: {str(e)}", 400
+            
+    except Exception as e:
+        print(f"ERROR: Failed to serve bill image: {e}")
+        return f"Server error: {str(e)}", 500
+
+@customer_app.route('/api/business/<business_id>/transactions', methods=['GET'])
+def api_business_transactions(business_id):
+    """API endpoint for business owners to view all transactions with bill photos"""
+    try:
+        # Get all transactions for this business
+        transactions_result = query_table('transactions', 
+                                        filters=[('business_id', 'eq', business_id)])
+        
+        if not transactions_result or not transactions_result.data:
+            return jsonify({'success': True, 'transactions': []})
+            
+        transactions = []
+        for tx in transactions_result.data:
+            # Get customer info
+            customer_result = query_table('customers', 
+                                        filters=[('id', 'eq', tx.get('customer_id'))])
+            customer_info = customer_result.data[0] if customer_result and customer_result.data else {}
+            
+            transaction_data = {
+                'id': tx.get('id'),
+                'customer_name': customer_info.get('name', 'Unknown Customer'),
+                'customer_phone': customer_info.get('phone_number', ''),
+                'amount': float(tx.get('amount', 0)),
+                'transaction_type': tx.get('transaction_type'),
+                'notes': tx.get('notes', ''),
+                'created_at': tx.get('created_at'),
+                'has_bill_photo': bool(tx.get('receipt_image_url')),
+                'bill_photo_url': f"/transaction/bill/{tx.get('id')}" if tx.get('receipt_image_url') else None
+            }
+            transactions.append(transaction_data)
+        
+        # Sort by date, newest first
+        transactions.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'transactions': transactions,
+            'total_count': len(transactions),
+            'with_photos': len([t for t in transactions if t['has_bill_photo']])
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@customer_app.route('/business-dashboard')
+def business_dashboard():
+    """Business dashboard to view all transactions and bill photos"""
+    return render_template('business_dashboard.html')
 
 # Error handling
 @customer_app.errorhandler(404)
