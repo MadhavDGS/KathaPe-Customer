@@ -854,6 +854,23 @@ def logout():
 def favicon():
     return send_from_directory('static', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+@customer_app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring and load balancers"""
+    try:
+        # Simple health check - you can add database connectivity check here
+        return jsonify({
+            'status': 'healthy',
+            'service': 'KathaPe Customer App',
+            'timestamp': get_ist_isoformat()
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': get_ist_isoformat()
+        }), 500
+
 @customer_app.route('/uploads/bills/<filename>')
 @login_required
 @customer_required

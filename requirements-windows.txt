@@ -1,0 +1,26 @@
+# KathaPe Customer - Windows Production Requirements
+# Install these packages for production deployment on Windows
+
+# Core Flask and database
+Flask==2.3.3
+psycopg2-binary==2.9.7
+Werkzeug==2.3.7
+
+# WSGI Server for Windows
+waitress==2.1.2
+
+# Image processing
+Pillow==10.0.1
+
+# Utilities
+python-dotenv==1.0.0
+requests==2.31.0
+
+# Date/time handling
+pytz==2023.3
+
+# UUID support
+uuid==1.30
+
+# JSON handling (usually built-in but explicit)
+simplejson==3.19.1
