@@ -31,10 +31,10 @@
     </div>
 
     <div class="action-buttons">
-        <a href="{{ url_for('customer_transaction', transaction_type='credit', business_id=business.id) }}" class="btn credit-btn">
+        <a href="{{ url_for('customer_transaction', transaction_type='credit', business_id=business['$id']) }}" class="btn credit-btn">
             <i class="fas fa-arrow-circle-up"></i> Take credit
         </a>
-        <a href="{{ url_for('customer_transaction', transaction_type='payment', business_id=business.id) }}" class="btn payment-btn">
+        <a href="{{ url_for('customer_transaction', transaction_type='payment', business_id=business['$id']) }}" class="btn payment-btn">
             <i class="fas fa-arrow-circle-down"></i> Pay Back
         </a>
     </div>

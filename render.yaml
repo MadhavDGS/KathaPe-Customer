@@ -3,12 +3,16 @@ services:
     name: khatape-customer
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:customer_app --bind 0.0.0.0:$PORT
-    plan: free
+    startCommand: gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    plan: free  # Change to 'starter' ($7/month) for production
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: false
       - key: RENDER
         value: true
-      - key: RENDER_EMERGENCY_LOGIN
-        value: false
+    # Database and secrets will be configured in Render dashboard
+    # EXTERNAL_DATABASE_URL will point to your college server
