@@ -12,7 +12,7 @@ appwrite==11.1.0
 # psycopg2-binary==2.9.7
 
 # Image processing
-Pillow==10.0.1
+Pillow==10.4.0
 
 # Utilities
 python-dotenv==1.0.0
@@ -22,7 +22,7 @@ requests==2.31.0
 pytz==2023.3
 
 # WSGI Server
-gunicorn==21.2.0
+gunicorn==22.0.0
 
 # UUID support (usually built-in)
 uuid==1.30
