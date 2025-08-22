@@ -11,12 +11,21 @@ from appwrite.exception import AppwriteException
 import uuid
 from datetime import datetime
 import pytz
+from werkzeug.security import generate_password_hash, check_password_hash
+
+# Helper to ensure required environment variables are set in production
+def get_required_env(var_name):
+    value = os.getenv(var_name)
+    # In a production environment (like on Render), we must have these values.
+    if not value and os.getenv('FLASK_ENV') == 'production':
+        raise ValueError(f"FATAL: Missing required environment variable '{var_name}'. Please set it in your deployment environment.")
+    return value
 
 # Appwrite Configuration
-APPWRITE_ENDPOINT = os.getenv('APPWRITE_ENDPOINT', 'https://syd.cloud.appwrite.io/v1')
-APPWRITE_PROJECT_ID = os.getenv('APPWRITE_PROJECT_ID', '123456789')
-APPWRITE_API_KEY = os.getenv('APPWRITE_API_KEY', 'standard')
-APPWRITE_DATABASE_ID = os.getenv('APPWRITE_DATABASE_ID', '123456789')
+APPWRITE_ENDPOINT = get_required_env('APPWRITE_ENDPOINT')
+APPWRITE_PROJECT_ID = get_required_env('APPWRITE_PROJECT_ID')
+APPWRITE_API_KEY = get_required_env('APPWRITE_API_KEY')
+APPWRITE_DATABASE_ID = get_required_env('APPWRITE_DATABASE_ID')
 
 # Initialize Appwrite Client
 appwrite_client = Client()
@@ -150,8 +159,8 @@ def login_user(phone_number, password):
         
         if users and len(users) > 0:
             user = users[0]
-            # Check password (in production, use proper password hashing)
-            if user.get('password') == password:
+            # Securely check the hashed password
+            if check_password_hash(user.get('password', ''), password):
                 return user
         
         return None
@@ -183,7 +192,7 @@ def register_user(name, phone_number, password):
             'name': name,
             'phone_number': phone_number,
             'user_type': 'customer',
-            'password': password,  # In production, hash this
+            'password': generate_password_hash(password),
             'created_at': get_ist_isoformat()
         }
         
@@ -196,6 +205,7 @@ def register_user(name, phone_number, password):
             # Create customer profile
             customer_id = str(uuid.uuid4())
             customer_data = {
+                'user_id': user_id,
                 'name': name,
                 'phone_number': phone_number,
                 'created_at': get_ist_isoformat()
