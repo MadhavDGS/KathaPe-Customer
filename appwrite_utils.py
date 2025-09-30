@@ -403,13 +403,16 @@ def upload_bill_image(file_data, filename, transaction_id):
         # Create a unique public ID
         public_id = f"bill_receipts/bill_{transaction_id}_{uuid.uuid4().hex[:8]}"
         
+        print(f"DEBUG: Uploading to Cloudinary with public_id: {public_id}")
+        print(f"DEBUG: File size: {len(file_data) if isinstance(file_data, bytes) else 'N/A'} bytes")
+        
         # Upload to Cloudinary with optimizations
         result = cloudinary.uploader.upload(
             file_data,
             public_id=public_id,
             resource_type="image",
-            # Automatic optimizations
-            quality="auto",
+            # Optimizations
+            quality="85",
             fetch_format="auto",
             # Transformations for better storage and performance
             width=1200,
@@ -421,11 +424,17 @@ def upload_bill_image(file_data, filename, transaction_id):
             backup=True
         )
         
-        print(f"DEBUG: Successfully uploaded bill image to Cloudinary with public_id: {public_id}")
+        print(f"DEBUG: Cloudinary upload successful!")
+        print(f"DEBUG: Result public_id: {result.get('public_id')}")
+        print(f"DEBUG: Result secure_url: {result.get('secure_url')}")
+        
         return result['public_id']
         
     except Exception as e:
-        print(f"Cloudinary error uploading bill image: {e}")
+        print(f"ERROR: Cloudinary error uploading bill image: {e}")
+        print(f"ERROR: Exception type: {type(e)}")
+        import traceback
+        print(f"ERROR: Traceback: {traceback.format_exc()}")
         return None
 
 def get_bill_image_url(public_id):
@@ -433,22 +442,30 @@ def get_bill_image_url(public_id):
     Get the optimized URL for a bill image from Cloudinary
     """
     try:
+        # First check if we have a valid public_id
+        if not public_id:
+            print(f"DEBUG: No public_id provided to get_bill_image_url")
+            return None
+            
+        print(f"DEBUG: Generating URL for public_id: {public_id}")
+        
         # Generate optimized URL with transformations
-        url = cloudinary.utils.cloudinary_url(
+        url, options = cloudinary.utils.cloudinary_url(
             public_id,
             # Automatic optimizations
-            quality="auto",
+            quality="85",
             fetch_format="auto",
-            # Responsive sizing
-            width="auto",
-            crop="scale",
+            # Responsive sizing 
+            width=800,
+            crop="limit",
             # Security
             secure=True
-        )[0]
+        )
         
+        print(f"DEBUG: Generated Cloudinary URL: {url}")
         return url
     except Exception as e:
-        print(f"Error generating Cloudinary URL: {e}")
+        print(f"ERROR: Error generating Cloudinary URL: {e}")
         return None
 
 def delete_bill_image(public_id):

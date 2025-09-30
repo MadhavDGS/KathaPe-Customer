@@ -908,102 +908,29 @@ def debug_bill_info(transaction_id):
     except Exception as e:
         return f"Error: {str(e)}", 500
 
-@customer_app.route('/transaction/bill/<transaction_id>')
-@login_required
-def serve_bill_from_database(transaction_id):
-    """Serve bill photo from Appwrite Storage"""
+@customer_app.route('/debug/cloudinary')
+def debug_cloudinary():
+    """Debug Cloudinary configuration on Render"""
+    import cloudinary
+    import cloudinary.utils
+    
+    debug_info = {
+        'environment_variables': {
+            'CLOUDINARY_CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME', 'NOT_SET'),
+            'CLOUDINARY_API_KEY': os.getenv('CLOUDINARY_API_KEY', 'NOT_SET'), 
+            'CLOUDINARY_API_SECRET': 'SET' if os.getenv('CLOUDINARY_API_SECRET') else 'NOT_SET'
+        },
+        'test_url_generation': None
+    }
+    
+    # Test URL generation
     try:
-        print(f"DEBUG: Serving bill for transaction {transaction_id}")
-        
-        # Get the transaction with bill file ID from Appwrite
-        transaction = appwrite_db_instance.get_document(TRANSACTIONS_COLLECTION, transaction_id)
-        
-        if not transaction:
-            print(f"DEBUG: Transaction {transaction_id} not found")
-            return "Transaction not found", 404
-            
-        file_id = transaction.get('receipt_image_url')
-        
-        if not file_id:
-            print(f"DEBUG: No bill photo file ID for transaction {transaction_id}")
-            return "No bill photo found", 404
-        
-        # Check if it's a legacy base64 format or file path
-        if file_id.startswith('/9j/') or file_id.startswith('data:') or file_id.startswith('/uploads/'):
-            print(f"DEBUG: Legacy format detected for transaction {transaction_id}")
-            return "Legacy format - please re-upload image", 404
-            
-        # Generate the public URL for the file
-        file_url = get_bill_image_url(file_id)
-        
-        if file_url:
-            print(f"DEBUG: Redirecting to file URL: {file_url}")
-            return redirect(file_url)
-        else:
-            print(f"DEBUG: Could not generate URL for file ID: {file_id}")
-            return "File not accessible", 404
-            
+        test_url = cloudinary.utils.cloudinary_url("test_image")[0]
+        debug_info['test_url_generation'] = test_url
     except Exception as e:
-        print(f"ERROR: Failed to serve bill image: {e}")
-        return f"Server error: {str(e)}", 500
-
-@customer_app.route('/api/business/<business_id>/transactions', methods=['GET'])
-def api_business_transactions(business_id):
-    """API endpoint for business owners to view all transactions with bill photos"""
-    try:
-        # Get all transactions for this business
-        transactions_result = query_table('transactions', 
-                                        filters=[('business_id', 'eq', business_id)])
-        
-        if not transactions_result or not transactions_result.data:
-            return jsonify({'success': True, 'transactions': []})
-            
-        transactions = []
-        for tx in transactions_result.data:
-            # Get customer info
-            customer_result = query_table('customers', 
-                                        filters=[('id', 'eq', tx.get('customer_id'))])
-            customer_info = customer_result.data[0] if customer_result and customer_result.data else {}
-            
-            transaction_data = {
-                'id': tx.get('id'),
-                'customer_name': customer_info.get('name', 'Unknown Customer'),
-                'customer_phone': customer_info.get('phone_number', ''),
-                'amount': float(tx.get('amount', 0)),
-                'transaction_type': tx.get('transaction_type'),
-                'notes': tx.get('notes', ''),
-                'created_at': tx.get('created_at'),
-                'has_bill_photo': bool(tx.get('receipt_image_url')),
-                'bill_photo_url': f"/transaction/bill/{tx.get('id')}" if tx.get('receipt_image_url') else None
-            }
-            transactions.append(transaction_data)
-        
-        # Sort by date, newest first
-        transactions.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-        
-        return jsonify({
-            'success': True,
-            'transactions': transactions,
-            'total_count': len(transactions),
-            'with_photos': len([t for t in transactions if t['has_bill_photo']])
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@customer_app.route('/business-dashboard')
-def business_dashboard():
-    """Business dashboard to view all transactions and bill photos"""
-    return render_template('business_dashboard.html')
-
-# Error handling
-@customer_app.errorhandler(404)
-def page_not_found(e):
-    return render_template('errors/404.html'), 404
-
-@customer_app.errorhandler(500)
-def server_error(e):
-    return render_template('errors/500.html'), 500
+        debug_info['test_url_generation'] = f"ERROR: {str(e)}"
+    
+    return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
 
 # API endpoints for mobile app integration
 @customer_app.route('/api/businesses')
