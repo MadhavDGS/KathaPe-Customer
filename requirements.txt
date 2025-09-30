@@ -11,8 +11,9 @@ appwrite==11.1.0
 # Legacy PostgreSQL (not needed with Appwrite)
 # psycopg2-binary==2.9.7
 
-# Image processing
+# Image processing and storage
 Pillow==10.4.0
+cloudinary==1.36.0
 
 # Utilities
 python-dotenv==1.0.0

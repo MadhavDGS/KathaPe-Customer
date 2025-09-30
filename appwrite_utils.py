@@ -8,6 +8,9 @@ from appwrite.services.databases import Databases
 from appwrite.services.account import Account
 from appwrite.query import Query
 from appwrite.exception import AppwriteException
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 import uuid
 from datetime import datetime
 import pytz
@@ -43,6 +46,14 @@ BUSINESSES_COLLECTION = os.getenv('BUSINESSES_COLLECTION_ID', 'businesses')
 CUSTOMERS_COLLECTION = os.getenv('CUSTOMERS_COLLECTION_ID', 'customers')
 CUSTOMER_CREDITS_COLLECTION = os.getenv('CUSTOMER_CREDITS_COLLECTION_ID', 'customer_credits')
 TRANSACTIONS_COLLECTION = os.getenv('TRANSACTIONS_COLLECTION_ID', 'transactions')
+
+# Cloudinary Configuration
+cloudinary.config(
+    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.getenv('CLOUDINARY_API_KEY'),
+    api_secret=os.getenv('CLOUDINARY_API_SECRET'),
+    secure=True
+)
 
 def get_ist_now():
     """Get current time in IST"""
@@ -382,3 +393,78 @@ def create_customer_credit_relationship(customer_id, business_id):
     except Exception as e:
         print(f"Error creating credit relationship: {e}")
         return None
+
+def upload_bill_image(file_data, filename, transaction_id):
+    """
+    Upload a bill image to Cloudinary
+    Returns the public_id if successful, None if failed
+    """
+    try:
+        # Create a unique public ID
+        public_id = f"bill_receipts/bill_{transaction_id}_{uuid.uuid4().hex[:8]}"
+        
+        # Upload to Cloudinary with optimizations
+        result = cloudinary.uploader.upload(
+            file_data,
+            public_id=public_id,
+            resource_type="image",
+            # Automatic optimizations
+            quality="auto",
+            fetch_format="auto",
+            # Transformations for better storage and performance
+            width=1200,
+            height=1200,
+            crop="limit",
+            # Add tags for organization
+            tags=["bill_receipt", f"transaction_{transaction_id}"],
+            # Enable backup
+            backup=True
+        )
+        
+        print(f"DEBUG: Successfully uploaded bill image to Cloudinary with public_id: {public_id}")
+        return result['public_id']
+        
+    except Exception as e:
+        print(f"Cloudinary error uploading bill image: {e}")
+        return None
+
+def get_bill_image_url(public_id):
+    """
+    Get the optimized URL for a bill image from Cloudinary
+    """
+    try:
+        # Generate optimized URL with transformations
+        url = cloudinary.utils.cloudinary_url(
+            public_id,
+            # Automatic optimizations
+            quality="auto",
+            fetch_format="auto",
+            # Responsive sizing
+            width="auto",
+            crop="scale",
+            # Security
+            secure=True
+        )[0]
+        
+        return url
+    except Exception as e:
+        print(f"Error generating Cloudinary URL: {e}")
+        return None
+
+def delete_bill_image(public_id):
+    """
+    Delete a bill image from Cloudinary
+    """
+    try:
+        result = cloudinary.uploader.destroy(public_id, resource_type="image")
+        
+        if result.get('result') == 'ok':
+            print(f"DEBUG: Successfully deleted bill image: {public_id}")
+            return True
+        else:
+            print(f"DEBUG: Failed to delete bill image: {public_id}, result: {result}")
+            return False
+            
+    except Exception as e:
+        print(f"Error deleting bill image from Cloudinary: {e}")
+        return False

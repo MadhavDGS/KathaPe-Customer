@@ -4,6 +4,10 @@ Run script for Customer Flask Application
 """
 import os
 import sys
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add parent directory to path to access shared modules
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,9 +21,10 @@ if __name__ == '__main__':
     print("Press Ctrl+C to stop the application")
     
     # Run the customer app
+    port = int(os.environ.get('CUSTOMER_PORT', 5002))
     customer_app.run(
         debug=True,
         host='0.0.0.0',
-        port=int(os.environ.get('PORT', 5002)),
+        port=port,
         threaded=True
     )

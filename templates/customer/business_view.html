@@ -93,7 +93,7 @@
                         
                         {% if bill_photo_url %}
                         <div class="bill-photo-container">
-                            <button data-transaction-id="{{ transaction.get('id') }}" onclick="showBillPhoto(this.dataset.transactionId)" class="btn-bill-photo">
+                            <button data-transaction-id="{{ transaction.get('$id') or transaction.get('id') }}" onclick="showBillPhoto(this.dataset.transactionId)" class="btn-bill-photo">
                                 <i class="fas fa-receipt"></i> View Bill
                             </button>
                         </div>

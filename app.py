@@ -2,7 +2,7 @@
 Customer Flask Application - Handles all customer-related operations
 """
 from appwrite_utils import *
-from appwrite_utils import get_ist_isoformat, get_ist_now
+from appwrite_utils import get_ist_isoformat, get_ist_now, upload_bill_image, get_bill_image_url
 import os
 import json
 import datetime
@@ -554,8 +554,8 @@ def customer_transaction(transaction_type, business_id):
         amount = request.form.get('amount')
         notes = request.form.get('notes', '')
         
-        # Handle file upload for bill photo
-        bill_photo_data = None
+        # Handle file upload for bill photo  
+        bill_file_id = None
         if 'bill_photo' in request.files:
             file = request.files['bill_photo']
             if file and file.filename != '':
@@ -565,48 +565,57 @@ def customer_transaction(transaction_type, business_id):
                         file.seek(0)  # Reset file pointer
                         file_data = file.read()
                         
-                        # Compress image before storing in database
-                        from PIL import Image
-                        import io
-                        import base64
-                        
-                        # Open and compress the image
-                        original_image = Image.open(io.BytesIO(file_data))
-                        
-                        # Convert to RGB if necessary (for JPEG compatibility)
-                        if original_image.mode in ('RGBA', 'LA', 'P'):
-                            original_image = original_image.convert('RGB')
-                        
-                        # Start with high quality and reduce if needed
-                        for quality in [85, 70, 55, 40]:
-                            output = io.BytesIO()
-                            original_image.save(output, format='JPEG', quality=quality, optimize=True)
-                            compressed_data = output.getvalue()
-                            
-                            # If compressed size is acceptable, break
-                            if len(compressed_data) < 500 * 1024:  # 500KB limit for database
-                                break
-                            
-                            # If still too large, resize image
-                            if quality == 40:
-                                width, height = original_image.size
-                                if width > 800 or height > 800:
-                                    original_image.thumbnail((800, 800), Image.Resampling.LANCZOS)
-                                    output = io.BytesIO()
-                                    original_image.save(output, format='JPEG', quality=70, optimize=True)
-                                    compressed_data = output.getvalue()
-                        
-                        # Final size check
-                        if len(compressed_data) > 1024 * 1024:  # 1MB final limit
-                            flash('Unable to compress image small enough. Please use a smaller image.', 'error')
+                        # Check file size (limit to 10MB)
+                        if len(file_data) > 10 * 1024 * 1024:
+                            flash('Image file too large. Please choose a file smaller than 10MB.', 'error')
                             return render_template('customer/transaction.html', 
                                                  business=business, 
                                                  transaction_type=transaction_type,
                                                  current_balance=current_balance)
                         
-                        # Convert to base64 for database storage
-                        bill_photo_data = base64.b64encode(compressed_data).decode('utf-8')
-                        print(f"DEBUG: Bill photo compressed and encoded to base64, size: {len(bill_photo_data)} characters")
+                        # Optional: Compress image for better storage efficiency
+                        from PIL import Image
+                        import io
+                        
+                        # Open and optimize the image
+                        try:
+                            original_image = Image.open(io.BytesIO(file_data))
+                            
+                            # Convert to RGB if necessary (for JPEG compatibility)
+                            if original_image.mode in ('RGBA', 'LA', 'P'):
+                                original_image = original_image.convert('RGB')
+                            
+                            # Resize if too large (max 1200px width/height)
+                            max_size = 1200
+                            if original_image.width > max_size or original_image.height > max_size:
+                                original_image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                            
+                            # Compress and save as JPEG
+                            output = io.BytesIO()
+                            original_image.save(output, format='JPEG', quality=85, optimize=True)
+                            file_data = output.getvalue()
+                            filename = secure_filename(file.filename)
+                            if not filename.lower().endswith('.jpg'):
+                                filename = filename.rsplit('.', 1)[0] + '.jpg'
+                                
+                            print(f"DEBUG: Optimized image size: {len(file_data)} bytes")
+                            
+                        except Exception as img_error:
+                            print(f"DEBUG: Could not optimize image, using original: {img_error}")
+                            filename = secure_filename(file.filename)
+                        
+                        # Generate a temporary transaction ID for the upload
+                        temp_transaction_id = str(uuid.uuid4())
+                        
+                        # Upload to Appwrite Storage
+                        bill_file_id = upload_bill_image(file_data, filename, temp_transaction_id)
+                        
+                        if bill_file_id:
+                            print(f"DEBUG: Successfully uploaded bill image with file ID: {bill_file_id}")
+                            flash('Bill photo uploaded successfully!', 'success')
+                        else:
+                            print(f"ERROR: Failed to upload bill image")
+                            flash('Failed to upload bill photo, but transaction will continue', 'warning')
                         
                     except Exception as e:
                         print(f"ERROR: Failed to process bill photo: {e}")
@@ -640,9 +649,9 @@ def customer_transaction(transaction_type, business_id):
                 'created_at': get_ist_isoformat()
             }
             
-            # Add bill photo data if available
-            if bill_photo_data:
-                transaction_data['receipt_image_url'] = bill_photo_data
+            # Add bill photo file ID if available
+            if bill_file_id:
+                transaction_data['receipt_image_url'] = bill_file_id
             
             print(f"DEBUG: Transaction data: {transaction_data}")
             
@@ -902,52 +911,37 @@ def debug_bill_info(transaction_id):
 @customer_app.route('/transaction/bill/<transaction_id>')
 @login_required
 def serve_bill_from_database(transaction_id):
-    """Serve bill photo directly from database"""
+    """Serve bill photo from Appwrite Storage"""
     try:
-        import base64
-        from flask import Response
-        
         print(f"DEBUG: Serving bill for transaction {transaction_id}")
         
-        # Get the transaction with bill photo data from Appwrite
+        # Get the transaction with bill file ID from Appwrite
         transaction = appwrite_db_instance.get_document(TRANSACTIONS_COLLECTION, transaction_id)
         
         if not transaction:
             print(f"DEBUG: Transaction {transaction_id} not found")
             return "Transaction not found", 404
-        bill_photo_data = transaction.get('receipt_image_url')
+            
+        file_id = transaction.get('receipt_image_url')
         
-        if not bill_photo_data:
-            print(f"DEBUG: No bill photo data for transaction {transaction_id}")
+        if not file_id:
+            print(f"DEBUG: No bill photo file ID for transaction {transaction_id}")
             return "No bill photo found", 404
-            
-        # Check if data is base64 encoded or old file path
-        if bill_photo_data.startswith('/uploads/bills/'):
-            print(f"DEBUG: Old file format for transaction {transaction_id}")
-            return "Old file format not supported", 404
-            
-        print(f"DEBUG: Found bill photo data, size: {len(bill_photo_data)} characters")
         
-        # Decode base64 image data
-        try:
-            image_data = base64.b64decode(bill_photo_data)
-            print(f"DEBUG: Decoded image data, size: {len(image_data)} bytes")
+        # Check if it's a legacy base64 format or file path
+        if file_id.startswith('/9j/') or file_id.startswith('data:') or file_id.startswith('/uploads/'):
+            print(f"DEBUG: Legacy format detected for transaction {transaction_id}")
+            return "Legacy format - please re-upload image", 404
             
-            # Determine content type based on image signature
-            content_type = 'image/jpeg'  # Default
-            if image_data.startswith(b'\x89PNG'):
-                content_type = 'image/png'
-            elif image_data.startswith(b'GIF'):
-                content_type = 'image/gif'
-            elif image_data.startswith(b'\xff\xd8'):
-                content_type = 'image/jpeg'
-                
-            print(f"DEBUG: Serving image as {content_type}")
-            return Response(image_data, mimetype=content_type)
-            
-        except Exception as e:
-            print(f"ERROR: Failed to decode image data: {e}")
-            return f"Invalid image data: {str(e)}", 400
+        # Generate the public URL for the file
+        file_url = get_bill_image_url(file_id)
+        
+        if file_url:
+            print(f"DEBUG: Redirecting to file URL: {file_url}")
+            return redirect(file_url)
+        else:
+            print(f"DEBUG: Could not generate URL for file ID: {file_id}")
+            return "File not accessible", 404
             
     except Exception as e:
         print(f"ERROR: Failed to serve bill image: {e}")
