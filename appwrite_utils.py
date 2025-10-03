@@ -64,6 +64,37 @@ def get_ist_isoformat():
     """Get current time in IST ISO format"""
     return get_ist_now().isoformat()
 
+def format_transaction_date(iso_date_string):
+    """Convert ISO date string to user-friendly format like 'October 3, 2025 10:30 PM'"""
+    try:
+        # Parse the ISO date string
+        if isinstance(iso_date_string, str):
+            # Handle different ISO formats
+            if '+' in iso_date_string:
+                # Format: 2025-10-03T22:30:00+05:30
+                dt = datetime.fromisoformat(iso_date_string)
+            else:
+                # Format: 2025-10-03T17:00:00.000Z or similar
+                dt = datetime.fromisoformat(iso_date_string.replace('Z', '+00:00'))
+        else:
+            dt = iso_date_string
+        
+        # Ensure it's in IST
+        ist = pytz.timezone('Asia/Kolkata')
+        if dt.tzinfo is None:
+            # If no timezone info, assume it's already in IST
+            dt = ist.localize(dt)
+        else:
+            # Convert to IST
+            dt = dt.astimezone(ist)
+        
+        # Format as "October 3, 2025 10:30 PM"
+        return dt.strftime("%B %d, %Y %I:%M %p")
+        
+    except Exception as e:
+        print(f"Error formatting date: {e}")
+        return str(iso_date_string)
+
 class AppwriteDB:
     """Appwrite database wrapper class"""
     

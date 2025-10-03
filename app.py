@@ -2,7 +2,7 @@
 Customer Flask Application - Handles all customer-related operations
 """
 from appwrite_utils import *
-from appwrite_utils import get_ist_isoformat, get_ist_now, upload_bill_image, get_bill_image_url
+from appwrite_utils import get_ist_isoformat, get_ist_now, upload_bill_image, get_bill_image_url, format_transaction_date
 import os
 import json
 import datetime
@@ -83,6 +83,11 @@ def format_datetime(value, format='%d %b %Y, %I:%M %p'):
 @customer_app.template_filter('datetime')
 def datetime_filter(value, format='%d %b %Y, %I:%M %p'):
     return format_datetime(value, format)
+
+@customer_app.template_filter('format_date')
+def format_date_filter(value):
+    """Format datetime with IST timezone to user-friendly format"""
+    return format_transaction_date(value)
 
 @customer_app.template_filter('currency')
 def currency_filter(value):

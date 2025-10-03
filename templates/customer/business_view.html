@@ -70,7 +70,7 @@
                             ₹{{ transaction.get('amount', 0) }}
                         </div>
                         <div class="transaction-date">
-                            {{ transaction.get('created_at', '')|datetime }}
+                            {{ transaction.get('created_at', '')|format_date }}
                         </div>
                         {% if transaction.get('notes') %}
                         <div class="transaction-notes">
