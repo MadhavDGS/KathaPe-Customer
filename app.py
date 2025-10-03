@@ -567,41 +567,45 @@ def customer_transaction(transaction_type, business_id):
                         file.seek(0)  # Reset file pointer
                         file_data = file.read()
                         
-                        # Check file size (limit to 10MB)
-                        if len(file_data) > 10 * 1024 * 1024:
-                            flash('Image file too large. Please choose a file smaller than 10MB.', 'error')
+                        # Check file size (limit to 5MB for faster uploads)
+                        if len(file_data) > 5 * 1024 * 1024:
+                            flash('Image file too large. Please choose a file smaller than 5MB.', 'error')
                             return render_template('customer/transaction.html', 
                                                  business=business, 
                                                  transaction_type=transaction_type,
                                                  current_balance=current_balance)
                         
-                        # Optional: Compress image for better storage efficiency
-                        from PIL import Image
-                        import io
+                        # Quick image optimization (only if file is large)
+                        filename = secure_filename(file.filename)
                         
-                        # Open and optimize the image
-                        try:
-                            original_image = Image.open(io.BytesIO(file_data))
-                            
-                            # Convert to RGB if necessary (for JPEG compatibility)
-                            if original_image.mode in ('RGBA', 'LA', 'P'):
-                                original_image = original_image.convert('RGB')
-                            
-                            # Resize if too large (max 1200px width/height)
-                            max_size = 1200
-                            if original_image.width > max_size or original_image.height > max_size:
-                                original_image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-                            
-                            # Compress and save as JPEG
-                            output = io.BytesIO()
-                            original_image.save(output, format='JPEG', quality=85, optimize=True)
-                            file_data = output.getvalue()
-                            filename = secure_filename(file.filename)
-                            if not filename.lower().endswith('.jpg'):
-                                filename = filename.rsplit('.', 1)[0] + '.jpg'
-                            
-                        except Exception as img_error:
-                            filename = secure_filename(file.filename)
+                        # Only compress if file is over 1MB
+                        if len(file_data) > 1 * 1024 * 1024:
+                            try:
+                                from PIL import Image
+                                import io
+                                
+                                original_image = Image.open(io.BytesIO(file_data))
+                                
+                                # Convert to RGB for JPEG
+                                if original_image.mode in ('RGBA', 'LA', 'P'):
+                                    original_image = original_image.convert('RGB')
+                                
+                                # Only resize if very large (max 800px for faster processing)
+                                max_size = 800
+                                if original_image.width > max_size or original_image.height > max_size:
+                                    original_image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                                
+                                # Quick compression
+                                output = io.BytesIO()
+                                original_image.save(output, format='JPEG', quality=75, optimize=False)
+                                file_data = output.getvalue()
+                                
+                                if not filename.lower().endswith('.jpg'):
+                                    filename = filename.rsplit('.', 1)[0] + '.jpg'
+                                    
+                            except Exception:
+                                # If compression fails, use original file
+                                pass
                         
                         # Generate a temporary transaction ID for the upload
                         temp_transaction_id = str(uuid.uuid4())

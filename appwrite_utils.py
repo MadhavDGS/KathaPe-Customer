@@ -396,37 +396,34 @@ def create_customer_credit_relationship(customer_id, business_id):
 
 def upload_bill_image(file_data, filename, transaction_id):
     """
-    Upload a bill image to Cloudinary
+    Upload a bill image to Cloudinary with fast auto-optimization
     Returns the public_id if successful, None if failed
     """
     try:
         # Create a unique public ID
         public_id = f"bill_receipts/bill_{transaction_id}_{uuid.uuid4().hex[:8]}"
         
-        # Upload to Cloudinary with optimizations
+        # Upload to Cloudinary with fast auto-optimization
         result = cloudinary.uploader.upload(
             file_data,
             public_id=public_id,
             resource_type="image",
-            # Optimizations
-            quality="85",
-            fetch_format="auto",
-            # Transformations for better storage and performance
-            width=1200,
-            height=1200,
-            crop="limit",
+            # Let Cloudinary handle optimization automatically
+            quality="auto:good",  # Auto quality for faster uploads
+            fetch_format="auto",  # Auto format selection
+            # Simple transformations for faster processing
+            width=1000,
+            crop="limit",  # Only resize if larger than 1000px
             # Add tags for organization
             tags=["bill_receipt", f"transaction_{transaction_id}"],
-            # Enable backup
-            backup=True
+            # Disable backup for faster uploads (can enable later if needed)
+            backup=False
         )
         
         return result['public_id']
         
     except Exception as e:
         print(f"ERROR: Cloudinary error uploading bill image: {e}")
-        import traceback
-        print(f"ERROR: Traceback: {traceback.format_exc()}")
         return None
 
 def get_bill_image_url(public_id):

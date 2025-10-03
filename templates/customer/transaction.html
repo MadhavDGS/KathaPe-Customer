@@ -74,9 +74,15 @@
                     <i class="fas fa-qrcode"></i> Pay via PhonePe QR
                 </button>
                 {% endif %}
-                <button type="submit" class="btn btn-primary transaction-btn {{ 'credit-btn' if transaction_type == 'credit' else 'payment-btn' }}">
-                    <i class="fas {{ 'fa-arrow-circle-up' if transaction_type == 'credit' else 'fa-arrow-circle-down' }}"></i>
-                    {{ 'Take Credit' if transaction_type == 'credit' else 'Make Payment' }}
+                <button type="submit" class="btn btn-primary transaction-btn {{ 'credit-btn' if transaction_type == 'credit' else 'payment-btn' }}" id="submitBtn">
+                    <span class="btn-text">
+                        <i class="fas {{ 'fa-arrow-circle-up' if transaction_type == 'credit' else 'fa-arrow-circle-down' }}"></i>
+                        {{ 'Take Credit' if transaction_type == 'credit' else 'Make Payment' }}
+                    </span>
+                    <span class="btn-loading" style="display: none;">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span id="loadingText">Processing...</span>
+                    </span>
                 </button>
                 <a href="{{ url_for('business_view', business_id=business.id) }}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i> Back to Business
@@ -378,6 +384,28 @@
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.3s ease;
+    position: relative;
+}
+
+.transaction-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+
+.btn-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-loading i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 .credit-btn {
@@ -898,10 +926,48 @@ window.onclick = function(event) {
     }
 }
 
+// Form submission with loading state
+document.querySelector('.transaction-form').addEventListener('submit', function(e) {
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = submitBtn.querySelector('.btn-text');
+    const btnLoading = submitBtn.querySelector('.btn-loading');
+    const loadingText = document.getElementById('loadingText');
+    const billPhoto = document.getElementById('bill_photo');
+    
+    // Show loading state
+    btnText.style.display = 'none';
+    btnLoading.style.display = 'flex';
+    submitBtn.disabled = true;
+    
+    // Update loading text based on whether photo is selected
+    if (billPhoto.files && billPhoto.files.length > 0) {
+        const fileSize = (billPhoto.files[0].size / 1024 / 1024).toFixed(1);
+        loadingText.textContent = `Uploading image (${fileSize}MB)...`;
+        
+        // Show progress updates
+        let dots = 0;
+        const progressInterval = setInterval(() => {
+            dots = (dots + 1) % 4;
+            loadingText.textContent = `Uploading image (${fileSize}MB)${'.'.repeat(dots)}`;
+        }, 500);
+        
+        // Store interval to clear later (form will submit and page will reload)
+        window.uploadProgressInterval = progressInterval;
+    } else {
+        loadingText.textContent = 'Processing transaction...';
+    }
+});
+
 // Photo preview functionality
 document.getElementById('bill_photo').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (file) {
+        // Check file size and show warning if large
+        const fileSize = (file.size / 1024 / 1024).toFixed(1);
+        if (file.size > 2 * 1024 * 1024) {  // 2MB
+            alert(`Large file selected (${fileSize}MB). Upload may take longer. Consider compressing the image for faster upload.`);
+        }
+        
         const reader = new FileReader();
         reader.onload = function(e) {
             document.getElementById('preview-image').src = e.target.result;
