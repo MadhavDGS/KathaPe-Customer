@@ -93,9 +93,9 @@
                         
                         {% if bill_photo_url %}
                         <div class="bill-photo-container">
-                            <button data-transaction-id="{{ transaction.get('$id') or transaction.get('id') }}" onclick="showBillPhoto(this.dataset.transactionId)" class="btn-bill-photo">
+                            <a href="{{ url_for('view_bill', transaction_id=transaction.get('$id') or transaction.get('id')) }}" class="btn-bill-photo">
                                 <i class="fas fa-receipt"></i> View Bill
-                            </button>
+                            </a>
                         </div>
                         {% endif %}
                     </div>
@@ -110,32 +110,7 @@
     </div>
 </div>
 
-<!-- Bill Photo Modal -->
-<div id="billPhotoModal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3><i class="fas fa-receipt"></i> Bill Photo</h3>
-            <span class="close" onclick="closeBillPhotoModal()">&times;</span>
-        </div>
-        <div class="modal-body">
-            <div id="billPhotoLoading" class="loading-section">
-                <div class="spinner"></div>
-                <h3>Loading bill photo...</h3>
-            </div>
-            <div id="billPhotoContent" class="bill-photo-section" style="display: none;">
-                <img id="billPhotoImage" src="" alt="Bill Photo" class="bill-photo-image">
-                <div class="bill-photo-actions">
-                    <button onclick="downloadBillPhoto()" class="btn btn-primary">
-                        <i class="fas fa-download"></i> Download
-                    </button>
-                    <button onclick="closeBillPhotoModal()" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Close
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+
 {% endblock %}
 
 {% block inline_css %}
@@ -669,71 +644,5 @@ body {
 {% endblock %}
 
 {% block scripts %}
-<script>
-let currentBillPhotoUrl = '';
-
-function showBillPhoto(transactionId) {
-    console.log('showBillPhoto called with:', transactionId);
-    const modal = document.getElementById('billPhotoModal');
-    const loading = document.getElementById('billPhotoLoading');
-    const content = document.getElementById('billPhotoContent');
-    const image = document.getElementById('billPhotoImage');
-    
-    console.log('Modal elements:', {modal, loading, content, image});
-    
-    if (!modal) {
-        console.error('Modal not found!');
-        return;
-    }
-    
-    // Show modal and loading state
-    modal.style.display = 'block';
-    loading.style.display = 'block';
-    content.style.display = 'none';
-    
-    // Load bill photo
-    const billPhotoUrl = `/transaction/bill/${transactionId}`;
-    currentBillPhotoUrl = billPhotoUrl;
-    
-    console.log('Loading bill photo from:', billPhotoUrl);
-    
-    // Create a new image element to preload
-    const img = new Image();
-    img.onload = function() {
-        console.log('Bill photo loaded successfully');
-        image.src = billPhotoUrl;
-        loading.style.display = 'none';
-        content.style.display = 'block';
-    };
-    img.onerror = function() {
-        console.error('Failed to load bill photo');
-        loading.innerHTML = '<p>Failed to load bill photo</p>';
-    };
-    img.src = billPhotoUrl;
-}
-
-function closeBillPhotoModal() {
-    document.getElementById('billPhotoModal').style.display = 'none';
-    currentBillPhotoUrl = '';
-}
-
-function downloadBillPhoto() {
-    if (currentBillPhotoUrl) {
-        const link = document.createElement('a');
-        link.href = currentBillPhotoUrl;
-        link.download = `bill_photo_${Date.now()}.jpg`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-}
-
-// Close modal when clicking outside of it
-window.onclick = function(event) {
-    const modal = document.getElementById('billPhotoModal');
-    if (event.target == modal) {
-        closeBillPhotoModal();
-    }
-}
-</script>
+<!-- No additional JavaScript needed - using server-side page navigation -->
 {% endblock %} 

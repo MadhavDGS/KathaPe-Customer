@@ -1025,6 +1025,55 @@ def serve_bill_image(transaction_id):
         print(f"Traceback: {traceback.format_exc()}")
         return f"Error serving bill image: {str(e)}", 500
 
+@customer_app.route('/view-bill/<transaction_id>')
+@login_required
+@customer_required
+def view_bill(transaction_id):
+    """View transaction bill with details (similar to business side)"""
+    try:
+        customer_id = session.get('customer_id')
+        
+        # Get the transaction
+        db = AppwriteDB()
+        transaction = db.get_document(TRANSACTIONS_COLLECTION, transaction_id)
+        
+        if not transaction:
+            flash('Transaction not found', 'error')
+            return redirect(url_for('customer_dashboard'))
+            
+        # Check if user has permission to view this transaction
+        if transaction.get('customer_id') != customer_id:
+            flash('Unauthorized access', 'error')
+            return redirect(url_for('customer_dashboard'))
+            
+        # Get business details
+        business_id = transaction.get('business_id')
+        business = db.get_document(BUSINESSES_COLLECTION, business_id)
+        
+        if not business:
+            flash('Business not found', 'error')
+            return redirect(url_for('customer_dashboard'))
+        
+        # Get customer details
+        customer = db.get_document(CUSTOMERS_COLLECTION, customer_id)
+        
+        # Generate bill image URL if available
+        bill_image_url = None
+        public_id = transaction.get('receipt_image_url')
+        if public_id:
+            bill_image_url = get_bill_image_url(public_id)
+        
+        return render_template('customer/view_bill.html',
+                             transaction=transaction,
+                             business=business,
+                             customer=customer,
+                             bill_image_url=bill_image_url)
+        
+    except Exception as e:
+        logger.error(f"Error in view_bill route: {str(e)}")
+        flash('Error loading bill details', 'error')
+        return redirect(url_for('customer_dashboard'))
+
 # Run the application
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5002))  # Render uses PORT env var
