@@ -48,10 +48,25 @@ CUSTOMER_CREDITS_COLLECTION = os.getenv('CUSTOMER_CREDITS_COLLECTION_ID', 'custo
 TRANSACTIONS_COLLECTION = os.getenv('TRANSACTIONS_COLLECTION_ID', 'transactions')
 
 # Cloudinary Configuration
+# Debug: Print environment variables (hide secrets in production)
+cloudinary_cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME')
+cloudinary_api_key = os.getenv('CLOUDINARY_API_KEY') 
+cloudinary_api_secret = os.getenv('CLOUDINARY_API_SECRET')
+
+print(f"DEBUG: Cloudinary config - Cloud Name: {cloudinary_cloud_name}")
+print(f"DEBUG: Cloudinary config - API Key: {cloudinary_api_key[:8]}..." if cloudinary_api_key else "DEBUG: Cloudinary config - API Key: None")
+print(f"DEBUG: Cloudinary config - API Secret: {'***' if cloudinary_api_secret else 'None'}")
+
+if not cloudinary_cloud_name or not cloudinary_api_key or not cloudinary_api_secret:
+    print("ERROR: Missing Cloudinary environment variables!")
+    print(f"CLOUDINARY_CLOUD_NAME: {bool(cloudinary_cloud_name)}")
+    print(f"CLOUDINARY_API_KEY: {bool(cloudinary_api_key)}")
+    print(f"CLOUDINARY_API_SECRET: {bool(cloudinary_api_secret)}")
+
 cloudinary.config(
-    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
-    api_key=os.getenv('CLOUDINARY_API_KEY'),
-    api_secret=os.getenv('CLOUDINARY_API_SECRET'),
+    cloud_name=cloudinary_cloud_name,
+    api_key=cloudinary_api_key,
+    api_secret=cloudinary_api_secret,
     secure=True
 )
 

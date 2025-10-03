@@ -112,6 +112,58 @@ def index():
         logger.error(f"Error in customer index route: {str(e)}")
         return redirect(url_for('login'))
 
+@customer_app.route('/test-cloudinary')
+def test_cloudinary():
+    """Test endpoint to verify Cloudinary configuration"""
+    try:
+        # Check environment variables first
+        env_check = {
+            'CLOUDINARY_CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
+            'CLOUDINARY_API_KEY': os.getenv('CLOUDINARY_API_KEY'),
+            'CLOUDINARY_API_SECRET': bool(os.getenv('CLOUDINARY_API_SECRET'))
+        }
+        
+        if not all([env_check['CLOUDINARY_CLOUD_NAME'], env_check['CLOUDINARY_API_KEY'], env_check['CLOUDINARY_API_SECRET']]):
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing Cloudinary environment variables',
+                'env_check': env_check
+            })
+        
+        # Try to import and test Cloudinary
+        from appwrite_utils import cloudinary
+        
+        # Test a simple upload to verify connection
+        test_result = cloudinary.uploader.upload(
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
+            public_id="test_connection_image",
+            resource_type="image"
+        )
+        
+        # Clean up test image
+        cloudinary.uploader.destroy("test_connection_image")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Cloudinary connection successful',
+            'test_upload': 'passed',
+            'env_check': env_check
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'message': f'Cloudinary test failed: {str(e)}',
+            'error_type': str(type(e)),
+            'traceback': traceback.format_exc(),
+            'env_check': {
+                'CLOUDINARY_CLOUD_NAME': bool(os.getenv('CLOUDINARY_CLOUD_NAME')),
+                'CLOUDINARY_API_KEY': bool(os.getenv('CLOUDINARY_API_KEY')),
+                'CLOUDINARY_API_SECRET': bool(os.getenv('CLOUDINARY_API_SECRET'))
+            }
+        })
+
 @customer_app.route('/login', methods=['GET', 'POST'])
 def login():
     try:
