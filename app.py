@@ -112,57 +112,7 @@ def index():
         logger.error(f"Error in customer index route: {str(e)}")
         return redirect(url_for('login'))
 
-@customer_app.route('/test-cloudinary')
-def test_cloudinary():
-    """Test endpoint to verify Cloudinary configuration"""
-    try:
-        # Check environment variables first
-        env_check = {
-            'CLOUDINARY_CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
-            'CLOUDINARY_API_KEY': os.getenv('CLOUDINARY_API_KEY'),
-            'CLOUDINARY_API_SECRET': bool(os.getenv('CLOUDINARY_API_SECRET'))
-        }
-        
-        if not all([env_check['CLOUDINARY_CLOUD_NAME'], env_check['CLOUDINARY_API_KEY'], env_check['CLOUDINARY_API_SECRET']]):
-            return jsonify({
-                'status': 'error',
-                'message': 'Missing Cloudinary environment variables',
-                'env_check': env_check
-            })
-        
-        # Try to import and test Cloudinary
-        from appwrite_utils import cloudinary
-        
-        # Test a simple upload to verify connection
-        test_result = cloudinary.uploader.upload(
-            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
-            public_id="test_connection_image",
-            resource_type="image"
-        )
-        
-        # Clean up test image
-        cloudinary.uploader.destroy("test_connection_image")
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'Cloudinary connection successful',
-            'test_upload': 'passed',
-            'env_check': env_check
-        })
-        
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'status': 'error',
-            'message': f'Cloudinary test failed: {str(e)}',
-            'error_type': str(type(e)),
-            'traceback': traceback.format_exc(),
-            'env_check': {
-                'CLOUDINARY_CLOUD_NAME': bool(os.getenv('CLOUDINARY_CLOUD_NAME')),
-                'CLOUDINARY_API_KEY': bool(os.getenv('CLOUDINARY_API_KEY')),
-                'CLOUDINARY_API_SECRET': bool(os.getenv('CLOUDINARY_API_SECRET'))
-            }
-        })
+
 
 @customer_app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -649,24 +599,19 @@ def customer_transaction(transaction_type, business_id):
                             filename = secure_filename(file.filename)
                             if not filename.lower().endswith('.jpg'):
                                 filename = filename.rsplit('.', 1)[0] + '.jpg'
-                                
-                            print(f"DEBUG: Optimized image size: {len(file_data)} bytes")
                             
                         except Exception as img_error:
-                            print(f"DEBUG: Could not optimize image, using original: {img_error}")
                             filename = secure_filename(file.filename)
                         
                         # Generate a temporary transaction ID for the upload
                         temp_transaction_id = str(uuid.uuid4())
                         
-                        # Upload to Appwrite Storage
+                        # Upload to Cloudinary
                         bill_file_id = upload_bill_image(file_data, filename, temp_transaction_id)
                         
                         if bill_file_id:
-                            print(f"DEBUG: Successfully uploaded bill image with file ID: {bill_file_id}")
                             flash('Bill photo uploaded successfully!', 'success')
                         else:
-                            print(f"ERROR: Failed to upload bill image")
                             flash('Failed to upload bill photo, but transaction will continue', 'warning')
                         
                     except Exception as e:
@@ -1043,6 +988,42 @@ def api_transactions(business_id):
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@customer_app.route('/transaction/bill/<transaction_id>')
+@login_required
+def serve_bill_image(transaction_id):
+    """Serve bill images from Cloudinary"""
+    try:
+        # Get the transaction to find the Cloudinary public_id
+        db = AppwriteDB()
+        transaction = db.get_document(TRANSACTIONS_COLLECTION, transaction_id)
+        
+        if not transaction:
+            return "Transaction not found", 404
+            
+        # Check if user has permission to view this transaction
+        customer_id = session.get('customer_id')
+        if transaction.get('customer_id') != customer_id:
+            return "Unauthorized", 403
+            
+        # Get the Cloudinary public_id from receipt_image_url field
+        public_id = transaction.get('receipt_image_url')
+        if not public_id:
+            return "No bill image found for this transaction", 404
+            
+        # Generate Cloudinary URL
+        bill_url = get_bill_image_url(public_id)
+        if not bill_url:
+            return "Failed to generate bill image URL", 500
+            
+        # Redirect to Cloudinary URL
+        return redirect(bill_url)
+        
+    except Exception as e:
+        print(f"ERROR: Failed to serve bill image: {e}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return f"Error serving bill image: {str(e)}", 500
 
 # Run the application
 if __name__ == '__main__':

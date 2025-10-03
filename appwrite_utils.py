@@ -48,25 +48,10 @@ CUSTOMER_CREDITS_COLLECTION = os.getenv('CUSTOMER_CREDITS_COLLECTION_ID', 'custo
 TRANSACTIONS_COLLECTION = os.getenv('TRANSACTIONS_COLLECTION_ID', 'transactions')
 
 # Cloudinary Configuration
-# Debug: Print environment variables (hide secrets in production)
-cloudinary_cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME')
-cloudinary_api_key = os.getenv('CLOUDINARY_API_KEY') 
-cloudinary_api_secret = os.getenv('CLOUDINARY_API_SECRET')
-
-print(f"DEBUG: Cloudinary config - Cloud Name: {cloudinary_cloud_name}")
-print(f"DEBUG: Cloudinary config - API Key: {cloudinary_api_key[:8]}..." if cloudinary_api_key else "DEBUG: Cloudinary config - API Key: None")
-print(f"DEBUG: Cloudinary config - API Secret: {'***' if cloudinary_api_secret else 'None'}")
-
-if not cloudinary_cloud_name or not cloudinary_api_key or not cloudinary_api_secret:
-    print("ERROR: Missing Cloudinary environment variables!")
-    print(f"CLOUDINARY_CLOUD_NAME: {bool(cloudinary_cloud_name)}")
-    print(f"CLOUDINARY_API_KEY: {bool(cloudinary_api_key)}")
-    print(f"CLOUDINARY_API_SECRET: {bool(cloudinary_api_secret)}")
-
 cloudinary.config(
-    cloud_name=cloudinary_cloud_name,
-    api_key=cloudinary_api_key,
-    api_secret=cloudinary_api_secret,
+    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.getenv('CLOUDINARY_API_KEY'),
+    api_secret=os.getenv('CLOUDINARY_API_SECRET'),
     secure=True
 )
 
@@ -418,9 +403,6 @@ def upload_bill_image(file_data, filename, transaction_id):
         # Create a unique public ID
         public_id = f"bill_receipts/bill_{transaction_id}_{uuid.uuid4().hex[:8]}"
         
-        print(f"DEBUG: Uploading to Cloudinary with public_id: {public_id}")
-        print(f"DEBUG: File size: {len(file_data) if isinstance(file_data, bytes) else 'N/A'} bytes")
-        
         # Upload to Cloudinary with optimizations
         result = cloudinary.uploader.upload(
             file_data,
@@ -439,15 +421,10 @@ def upload_bill_image(file_data, filename, transaction_id):
             backup=True
         )
         
-        print(f"DEBUG: Cloudinary upload successful!")
-        print(f"DEBUG: Result public_id: {result.get('public_id')}")
-        print(f"DEBUG: Result secure_url: {result.get('secure_url')}")
-        
         return result['public_id']
         
     except Exception as e:
         print(f"ERROR: Cloudinary error uploading bill image: {e}")
-        print(f"ERROR: Exception type: {type(e)}")
         import traceback
         print(f"ERROR: Traceback: {traceback.format_exc()}")
         return None
@@ -459,10 +436,7 @@ def get_bill_image_url(public_id):
     try:
         # First check if we have a valid public_id
         if not public_id:
-            print(f"DEBUG: No public_id provided to get_bill_image_url")
             return None
-            
-        print(f"DEBUG: Generating URL for public_id: {public_id}")
         
         # Generate optimized URL with transformations
         url, options = cloudinary.utils.cloudinary_url(
@@ -477,7 +451,6 @@ def get_bill_image_url(public_id):
             secure=True
         )
         
-        print(f"DEBUG: Generated Cloudinary URL: {url}")
         return url
     except Exception as e:
         print(f"ERROR: Error generating Cloudinary URL: {e}")
@@ -489,14 +462,7 @@ def delete_bill_image(public_id):
     """
     try:
         result = cloudinary.uploader.destroy(public_id, resource_type="image")
-        
-        if result.get('result') == 'ok':
-            print(f"DEBUG: Successfully deleted bill image: {public_id}")
-            return True
-        else:
-            print(f"DEBUG: Failed to delete bill image: {public_id}, result: {result}")
-            return False
-            
+        return result.get('result') == 'ok'
     except Exception as e:
         print(f"Error deleting bill image from Cloudinary: {e}")
         return False
