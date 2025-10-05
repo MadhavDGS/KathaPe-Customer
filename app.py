@@ -861,6 +861,33 @@ def logout():
 def favicon():
     return send_from_directory('static', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+@customer_app.route('/.well-known/assetlinks.json')
+def asset_links():
+    """Digital Asset Links for Android TWA - Required for Play Store app"""
+    # TODO: Replace with your actual SHA256 fingerprint after creating signing key
+    # Get fingerprint using: keytool -list -v -keystore your-keystore.keystore -alias your-alias
+    asset_links_json = [{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "com.kathape.customer",
+            "sha256_cert_fingerprints": [
+                "REPLACE_WITH_YOUR_SHA256_FINGERPRINT_FROM_KEYSTORE"
+            ]
+        }
+    }]
+    return jsonify(asset_links_json), 200, {'Content-Type': 'application/json'}
+
+@customer_app.route('/privacy')
+def privacy_policy():
+    """Privacy Policy page - Required for Play Store"""
+    return render_template('privacy.html')
+
+@customer_app.route('/terms')
+def terms_of_service():
+    """Terms of Service page - Required for Play Store"""
+    return render_template('terms.html')
+
 @customer_app.route('/health')
 def health_check():
     """Health check endpoint for monitoring and load balancers"""
